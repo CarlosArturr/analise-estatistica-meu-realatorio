@@ -1,0 +1,229 @@
+%% Author_tex.tex
+%% V1.0
+%% 2012/13/12
+%% developed by Techset
+%%
+%% This file describes the coding for modeloUFCG.cls
+
+%% O Quarto copia os arquivos de suporte da extensao (resources: no
+%% _extension.yml) preservando o caminho relativo _extensions/modeloufcg/,
+%% entao o .cls, o .bst e o logo sao referenciados com esse prefixo.
+\documentclass[a4paper]{_extensions/modeloufcg/modeloUFCG}
+
+\usepackage[portuguese]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{longtable}
+\newcounter{none} % tabelas sem legenda numerada (usado pelo Quarto/crossref)
+\usepackage{array}
+\usepackage{calc}
+%% Fixa cada figura exatamente onde e gerada ([H]). Sem isso, floats podem
+%% "flutuar" livremente e, neste documento (muitas figuras grandes em
+%% sequencia), acabam se deslocando para muito longe do texto que os
+%% referencia -- inclusive interferindo na quebra de pagina de tabelas
+%% longtable vizinhas.
+\usepackage{float}
+
+%% A classe modeloUFCG.cls calcula largura/altura de texto e margens
+%% assumindo o formato de trim de um periodico (174mm x 247mm), mas o PDF
+%% final e produzido em A4 (210mm x 297mm). Isso deixa sobras enormes nas
+%% margens. O pacote geometry forca margens A4 corretas, sobrepondo o
+%% calculo original da classe.
+\usepackage[a4paper, margin=2.5cm]{geometry}
+
+\pagestyle{fancy}
+\renewcommand{\headrulewidth}{0pt}
+\fancyhead[L]{}
+\fancyhead[C]{}
+\fancyhead[R]{}
+
+%% A classe usa \flushbottom, que estica os espacos em branco de cada pagina
+%% para preenche-la ate o final. Combinado com figuras fixas ([H]), isso cria
+%% buracos enormes entre uma figura/tabela e o texto seguinte. \raggedbottom
+%% deixa o espaco sobrando apenas no rodape da pagina, sem esticar o meio.
+\raggedbottom
+
+%% Espacamento mais enxuto ao redor de figuras e tabelas.
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+
+$for(header-includes)$
+$header-includes$
+$endfor$
+
+%%%% *** Do not adjust lengths that control margins, column widths, etc. ***
+
+%%%%%%%%%%% Defining Enunciations  %%%%%%%%%%%
+\newtheorem{theorem}{\bf Teorema}[section]
+\newtheorem{condition}{\bf Condição}[section]
+\newtheorem{corollary}{\bf Corolário}[section]
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{titlesec}
+\renewcommand{\thesection}{\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+
+%%%% Cabecalho no estilo de artigo academico, substituindo a capa           %%%%
+%%%% original (logo + caixa de titulo) do template Royal Society.          %%%%
+%%%% A caixa de resumo estreita e trocada por um resumo de largura total,  %%%%
+%%%% exibido logo apos o titulo/autores, como em um artigo convencional.   %%%%
+%% Apos o \documentclass terminar de carregar, o LaTeX restaura o catcode de
+%% @ para "outro", entao qualquer referencia a comandos internos da classe
+%% (\@title, \@author, \if@subject@provided etc.) precisa ficar dentro de
+%% \makeatletter ... \makeatother para ser reconhecida corretamente.
+\makeatletter
+
+%% Centraliza as legendas de figuras e tabelas (a classe original as deixa
+%% alinhadas a esquerda).
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \centering{\captionheadfont #1.}\hskip2.5pt{\captionfont #2}\par
+  \vskip\belowcaptionskip}
+
+\renewenvironment{abstract}{%
+  \global\setbox\absbox\vbox\bgroup\par\abstractfont
+  \leftskip0pc\rightskip0pc\noindent\ignorespaces
+}{\par\egroup}
+
+%% A classe modeloUFCG.cls define \@maketitle atraves de mecanismos internos
+%% (fila de duas colunas / bloco de revisao editorial) que absorvem qualquer
+%% redefinicao de \@maketitle sem executa-la. Para evitar essa maquinaria,
+%% \maketitle e redefinido diretamente aqui.
+\renewcommand\maketitle{%
+  \vspace*{-2.2cm}
+  \noindent\begin{minipage}[c]{2.2cm}
+    \includegraphics[width=2cm]{_extensions/modeloufcg/lea_logo_bw}
+  \end{minipage}%
+  \begin{minipage}[c]{\textwidth-2.2cm}
+    {\fontfamily{\sfdefault}\fontseries{b}\fontshape{n}\fontsize{12}{14}\selectfont
+      UNIVERSIDADE FEDERAL DE CAMPINA GRANDE\par}
+    $if(disciplina)$
+      {\fontfamily{\sfdefault}\fontseries{m}\fontshape{n}\fontsize{11}{13}\selectfont
+       Disciplina: $disciplina$%
+       $if(periodo)$ \quad---\quad Período: $periodo$$endif$\par}
+    $endif$
+    $if(professores)$
+      {\fontfamily{\sfdefault}\fontseries{m}\fontshape{n}\fontsize{11}{13}\selectfont
+       Professores: $for(professores)$$professores$$sep$; $endfor$\par}
+    $endif$
+  \end{minipage}
+  \vskip4pt
+  \rule{\textwidth}{.5pt}
+  \vskip8pt
+  \begin{center}
+    {\fontfamily{\sfdefault}\fontseries{m}\fontshape{n}\fontsize{16}{18}\selectfont\mathversion{bold}\@title\par}
+    \vskip6pt
+    {\authorfont\@author\par}
+    \vskip3pt
+    \ifx\@address\empty\else
+      {\addressfont\@address\par}
+    \fi
+    \vskip6pt
+    \rule{\textwidth}{.5pt}
+  \end{center}
+  \vskip8pt
+  \ifvoid\absbox\else
+    {\fontfamily{\sfdefault}\fontseries{b}\fontshape{n}\fontsize{11}{13}\selectfont Resumo}\par
+    \vskip4pt
+    \noindent\usebox\absbox\par
+    \vskip6pt
+  \fi
+  \if@subject@provided
+    {\subjectfont\@subject\par}
+    \vskip4pt
+  \fi
+  \if@keywords@provided
+    {\keywordfont\@keywords\par}
+  \fi
+  \vskip10pt
+}
+
+\makeatother
+
+\begin{document}
+
+%%%% Article title to be placed here
+\title{$title$}
+
+\author{
+$for(author)$
+$author.name$$$^{$author.affiliation$}$$$sep$,
+$endfor$
+}
+
+\address{
+$for(address)$
+  $$^{$address.code$}$$$address.address$$sep$\\
+$endfor$
+}
+%%%% Subject entries to be placed here %%%%
+\subject{
+$for(subject-areas)$
+$subject-areas$$sep$,
+$endfor$
+}
+
+%%%% Keyword entries to be placed here %%%%
+\keywords{
+$for(keywords)$
+$keywords$$sep$,
+$endfor$
+}
+
+%%%% Abstract text to be placed here %%%%%%%%%%%%
+\begin{abstract}
+$abstract$
+\end{abstract}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Some pieces required from the pandoc template
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\providecommand{\EndFirstPage}{%
+}
+%% O Quarto (ao contrario do fluxo R Markdown, que usa --no-highlight) sempre
+%% injeta \pandocbounded ao redor de imagens; a classe nao o define.
+\providecommand{\pandocbounded}[1]{#1}
+
+\maketitle
+
+$body$
+
+$if(ethics)$
+\ethics{$ethics$}
+$endif$
+
+$if(data_accessibility)$
+\dataccess{$data_accessibility$}
+$endif$
+
+$if(conflict_of_interest)$
+\competing{$conflict_of_interest$}
+$endif$
+
+$if(funding)$
+\funding{$funding$}
+$endif$
+
+$if(disclaimer)$
+\disclaimer{$disclaimer$}
+$endif$
+
+$if(acknowledgements)$
+\ack{$acknowledgements$}
+$endif$
+
+$if(natbib)$
+\bibliographystyle{_extensions/modeloufcg/RS}
+\bibliography{$bibliography$}
+$endif$
+
+$for(include-after)$
+$include-after$
+$endfor$
+
+\end{document}
