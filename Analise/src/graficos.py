@@ -11,69 +11,42 @@ PASTA_RESULTADOS = Path("../resultados")
 PASTA_RESULTADOS.mkdir(parents=True, exist_ok=True)
 
 dados = dt.extract()
-numericas = dt.variaveisNumericas()
-dados_longos = dt.dadosLongos(dados)
-g = sns.catplot(
-    data=dados_longos,
-    x="ShelveLoc",
-    y="Valor",
-    col="Variavel",
-    kind="box",
-    col_wrap=2,
-    sharey=False,
-    height=4,
-    color="lightgray"
-)
 
-for ax, variavel in zip(g.axes.flat, numericas):
+#Relacionando sales as variaveis qualitativas
 
-    sns.stripplot(
-        data=dados_longos[dados_longos["Variavel"] == variavel],
-        x="ShelveLoc",
-        y="Valor",
-        color="black",
-        alpha=0.5,
-        size=3,
-        jitter=0.2,
-        ax=ax
-    )
+plt.figure(figsize=(6, 5))
 
-    ax.set_xlabel("")
-    ax.set_ylabel("Valor")
+ordem = ["Bad", "Medium", "Good"]
+cores = {
+    "Bad": "#d73027",      # vermelho
+    "Medium": "#fee08b",   # amarelo
+    "Good": "#1a9850"      # verde
+}
 
-
-g.figure.suptitle(
-    "Distribuição das variáveis por qualidade da prateleira",
-    fontsize=14
-)
-
-g.figure.subplots_adjust(top=0.92)
-
-g.figure.savefig(
-    PASTA_GRAFICOS / "distribuicao_variaveis_shelveloc.png",
-    dpi=300
-)
-
-plt.close(g.figure)
-
-plt.figure(figsize=(6,5))
 
 sns.boxplot(
     data=dados,
-    x="ShelveLoc",
-    y="Sales"
+    x="Urban",
+    y="Sales",
+    palette=cores,
+    legend=False
 )
 
 sns.stripplot(
     data=dados,
     x="ShelveLoc",
     y="Sales",
+    order=ordem,
     color="black",
-    alpha=0.4
+    alpha=0.4,
+    jitter=True
 )
 
-plt.title("Sales por qualidade da prateleira")
+plt.title("Distribuição das vendas por qualidade da prateleira")
+plt.xlabel("Qualidade da Prateleira (ShelveLoc)")
+plt.ylabel("Vendas (Sales)")
 
+plt.tight_layout()
 plt.savefig(
     PASTA_GRAFICOS / "sales_shelveloc.png",
     dpi=300,
@@ -84,10 +57,16 @@ plt.close()
 
 plt.figure(figsize=(6,5))
 
+cores = {
+    "No": "#d73027",      # vermelho
+    "Yes": "#1a9850"      # verde
+}
+
 sns.boxplot(
     data=dados,
     x="Urban",
-    y="Sales"
+    y="Sales",
+    palette=cores
 )
 
 sns.stripplot(
@@ -133,12 +112,45 @@ plt.savefig(
 )
 
 plt.close()
+"""
+#Metricas numericas
+
+dados = dt.extract()
+numericas = dt.variaveisNumericas()
+dados_longos = dt.dadosLongos(dados)
+g = sns.catplot(
+    data=dados_longos,
+    x="Sales",
+    y="Valor",
+    col="Variavel",
+    kind="box",
+    col_wrap=2,
+    sharey=False,
+    height=4,
+    color="lightgray"
+)
+
+for ax, variavel in zip(g.axes.flat, numericas):
+
+    sns.stripplot(
+        data=dados_longos[dados_longos["Variavel"] == variavel],
+        x="Sales",
+        y="Valor",
+        color="black",
+        alpha=0.5,
+        size=3,
+        jitter=0.2,
+        ax=ax
+    )
+
+    ax.set_xlabel("")
+    ax.set_ylabel("Valor")
 
 colunas = dt.colunas()
 
 g = sns.pairplot(
     dados[colunas],
-    hue="ShelveLoc",
+    hue="Sales",
     diag_kind="kde",
     corner=False,
     plot_kws={"alpha": 0.6, "s": 25},
@@ -168,7 +180,10 @@ matriz_cor = numericas.corr()
 # Arredonda para 3 casas decimais
 print(matriz_cor.round(3))
 
-matriz_cor.round(3).to_csv("../resultados/matriz_correlacao.csv")
+matriz_cor.round(3).to_csv(
+    PASTA_RESULTADOS / "matriz_correlacao.csv",
+    index=True
+)
 
 plt.figure(figsize=(10, 8))
 
@@ -192,3 +207,4 @@ plt.savefig(
 )
 
 plt.close()
+"""

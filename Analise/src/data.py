@@ -129,7 +129,7 @@ def variaveisNumericas():
 
 def dadosLongos(dados):
     dados_longos = dados.melt(
-    id_vars="ShelveLoc",
+    id_vars="Sales",
     value_vars=variaveisNumericas(),
     var_name="Variavel",
     value_name="Valor"
