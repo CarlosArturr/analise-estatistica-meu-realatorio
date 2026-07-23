@@ -15,6 +15,16 @@ def extract():
     categorias = ["ShelveLoc", "Urban", "US"]
     dados[categorias] = dados[categorias].astype("category")
 
+    categorias = ["ShelveLoc", "Urban", "US"]
+
+    for coluna in categorias:
+        dados[coluna] = (
+            dados[coluna]
+            .astype(str)
+            .str.strip()
+            .astype("category")
+        )
+
     return dados
 
 def colunas():
@@ -127,11 +137,24 @@ def variaveisNumericas():
 ]
     return numericas
 
-def dadosLongos(dados):
-    dados_longos = dados.melt(
-    id_vars="Sales",
-    value_vars=variaveisNumericas(),
-    var_name="Variavel",
-    value_name="Valor"
-)
-    return dados_longos
+def dados_convertidos_int():
+    dados_int = extract()
+    dados_int["ShelveLoc"] = (
+        dados_int["ShelveLoc"]
+        .map({"Bad": 1, "Medium": 2, "Good": 3})
+        .astype(int)
+    )
+
+    dados_int["Urban"] = (
+        dados_int["Urban"]
+        .map({"No": 0, "Yes": 1})
+        .astype(int)
+    )
+
+    dados_int["US"] = (
+        dados_int["US"]
+        .map({"No": 0, "Yes": 1})
+        .astype(int)
+    )
+
+    return dados_int

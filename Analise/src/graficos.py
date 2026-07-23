@@ -16,30 +16,29 @@ dados = dt.extract()
 
 plt.figure(figsize=(6, 5))
 
-ordem = ["Bad", "Medium", "Good"]
 cores = {
-    "Bad": "#d73027",      # vermelho
-    "Medium": "#fee08b",   # amarelo
-    "Good": "#1a9850"      # verde
+    "Bad": "#cb3028",      # vermelho
+    "Medium": "#f7cd5c",   # amarelo
+    "Good": "#1d874b"      # verde
 }
 
 
 sns.boxplot(
     data=dados,
-    x="Urban",
+    x="ShelveLoc",
     y="Sales",
-    palette=cores,
-    legend=False
+    order=["Bad", "Medium", "Good"],
+    palette=cores
 )
 
 sns.stripplot(
     data=dados,
     x="ShelveLoc",
     y="Sales",
-    order=ordem,
+    order=["Bad", "Medium", "Good"],
     color="black",
     alpha=0.4,
-    jitter=True
+    jitter=0.2
 )
 
 plt.title("Distribuição das vendas por qualidade da prateleira")
@@ -58,15 +57,18 @@ plt.close()
 plt.figure(figsize=(6,5))
 
 cores = {
-    "No": "#d73027",      # vermelho
-    "Yes": "#1a9850"      # verde
+    "No": "#cb3028",      # vermelho
+    "Yes": "#1d874b"      # verde
 }
 
 sns.boxplot(
     data=dados,
     x="Urban",
     y="Sales",
-    palette=cores
+    hue="Urban",
+    palette=cores,
+    dodge=False,
+    legend=False
 )
 
 sns.stripplot(
@@ -74,7 +76,8 @@ sns.stripplot(
     x="Urban",
     y="Sales",
     color="black",
-    alpha=0.4
+    alpha=0.4,
+    jitter=0.2
 )
 
 plt.title("Sales por localização urbana")
@@ -89,18 +92,29 @@ plt.close()
 
 plt.figure(figsize=(6,5))
 
+cores = {
+    "No": "#cb3028",      # vermelho
+    "Yes": "#1d874b"      # verde
+}
+
 sns.boxplot(
     data=dados,
     x="US",
-    y="Sales"
+    y="Sales",
+    hue="US",
+    palette=cores,
+    dodge=False,
+    legend=False
 )
 
 sns.stripplot(
     data=dados,
     x="US",
     y="Sales",
+    order= ["No", "Yes"],
     color="black",
-    alpha=0.4
+    alpha=0.4,
+    jitter=0.2
 )
 
 plt.title("Sales por país")
@@ -112,49 +126,15 @@ plt.savefig(
 )
 
 plt.close()
-"""
+
 #Metricas numericas
 
-dados = dt.extract()
-numericas = dt.variaveisNumericas()
-dados_longos = dt.dadosLongos(dados)
-g = sns.catplot(
-    data=dados_longos,
-    x="Sales",
-    y="Valor",
-    col="Variavel",
-    kind="box",
-    col_wrap=2,
-    sharey=False,
-    height=4,
-    color="lightgray"
-)
-
-for ax, variavel in zip(g.axes.flat, numericas):
-
-    sns.stripplot(
-        data=dados_longos[dados_longos["Variavel"] == variavel],
-        x="Sales",
-        y="Valor",
-        color="black",
-        alpha=0.5,
-        size=3,
-        jitter=0.2,
-        ax=ax
-    )
-
-    ax.set_xlabel("")
-    ax.set_ylabel("Valor")
-
-colunas = dt.colunas()
+plt.figure(figsize=(6,5))
 
 g = sns.pairplot(
-    dados[colunas],
-    hue="Sales",
-    diag_kind="kde",
-    corner=False,
-    plot_kws={"alpha": 0.6, "s": 25},
-    diag_kws={"fill": True}
+    dados[dt.colunas()],
+    corner=True,
+    diag_kind="kde"
 )
 
 g.figure.suptitle(
@@ -170,14 +150,45 @@ g.figure.savefig(
 
 plt.close(g.figure)
 
+plt.figure(figsize=(6,5))
 
-# Seleciona apenas as variáveis numéricas
+sns.boxplot(
+    data=dados,
+    x="ShelveLoc",
+    y="Sales",
+    order=["Bad","Medium","Good"],
+    showmeans=True,
+    meanprops={
+        "marker":"D",
+        "markerfacecolor":"red",
+        "markeredgecolor":"black"
+    }
+)
+
+plt.figure(figsize=(6,5))
+
+sns.pointplot(
+    data=dados,
+    x="ShelveLoc",
+    y="Sales",
+    order=["Bad","Medium","Good"],
+    errorbar=("ci",95)
+)
+
+plt.title("Média de Sales por qualidade da prateleira")
+
+plt.savefig(
+    PASTA_GRAFICOS / "media_sales_shelveloc.png",
+    dpi=300,
+    bbox_inches="tight"
+)
+
+plt.close()
+
 numericas = dados.select_dtypes(include="number").drop(columns="id")
 
-# Matriz de correlação de Pearson
 matriz_cor = numericas.corr()
 
-# Arredonda para 3 casas decimais
 print(matriz_cor.round(3))
 
 matriz_cor.round(3).to_csv(
@@ -207,4 +218,41 @@ plt.savefig(
 )
 
 plt.close()
-"""
+
+dados_corr = dt.dados_convertidos_int()
+
+numericas = dados_corr.select_dtypes(include="number").drop(columns="id")
+
+matriz_cor = numericas.corr(method="spearman")
+
+print(matriz_cor.round(3))
+
+matriz_cor.round(3).to_csv(
+    PASTA_RESULTADOS / "matriz_correlacao.csv"
+)
+
+plt.figure(figsize=(12, 10))
+
+sns.heatmap(
+    matriz_cor,
+    annot=True,
+    fmt=".2f",
+    cmap="coolwarm",
+    center=0,
+    vmin=-1,
+    vmax=1,
+    linewidths=0.5,
+    square=True
+)
+
+plt.title("Matriz de Correlação (incluindo variáveis categóricas codificadas)")
+
+plt.tight_layout()
+
+plt.savefig(
+    PASTA_GRAFICOS / "matriz_correlacao_total.png",
+    dpi=300,
+    bbox_inches="tight"
+)
+
+plt.close()
