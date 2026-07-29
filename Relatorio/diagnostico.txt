@@ -1,0 +1,18 @@
+-Linearidade: Gráfico Resíduos X Ajustados
+    A tendência suavizada segue comportamento linear sobreposta ao eixo 0.
+    Linearidade validada.
+
+-Homocedasticidade: Gráficos Resíduos X Ajustados e Escala-localização
+    A nuvem de pontos no gráfico Resíduos X Ajustados é aleatória.
+    No segundo gráfico, a linha vermelha também tem comportamento linear, com dispersão constante dos pontos.
+    Homocedasticidade validada.
+
+-Normalidade Aproximada: QQ-Plot 
+    Os resíduos acompanham a reta teórica precisamente, e todos dentro do envelope.
+    Normalidade validada, seguem distribuição Gaussiana.
+
+-Alavancagem e Influência: 
+    Nenhum ponto tem alta alavancagem e alto resíduo, e os pontos além do limite tem distância de Cook baixa.
+    Nenhum ponto influente corrompe a equação.
+
+Com base na análise dos gráficos, o modelo está aprovado.

@@ -1,80 +1,36 @@
-from statsmodels.stats.anova import anova_lm
+import pandas as pd
 import statsmodels.formula.api as smf
+from statsmodels.stats.anova import anova_lm
+from pathlib import Path
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-import data as dt
+arquivo = Path(__file__).resolve().parent.parent / "dados" / "04_Carseats.csv"
+df = pd.read_csv(arquivo)
 
-modelo_completo = smf.ols(
-    "Sales ~ CompPrice + Income + Advertising + Population + Price + ShelveLoc + Age + Education + Urban + US",
-    data= dt.extract()
-).fit()
+#Comparando o modelo completo com o melhor encontrado
+modelo_completo = smf.ols('Sales ~ CompPrice + Income + Advertising + Population + Price + Age + Education + C(ShelveLoc) + C(Urban) + C(US)', data=df).fit()
+
+modelo_melhor = smf.ols('Sales ~ CompPrice + Income + Advertising + Price + Age + C(ShelveLoc)', data=df).fit()
 
 print(modelo_completo.summary())
+print(modelo_melhor.summary())
 
-import statsmodels.formula.api as smf
+print("AIC Completo: ", modelo_completo.aic)
+print("AIC Melhor: ", modelo_melhor.aic)
 
-variaveis = [
-    "CompPrice",
-    "Income",
-    "Advertising",
-    "Population",
-    "Price",
-    "ShelveLoc",
-    "Age",
-    "Education",
-    "Urban",
-    "US"
-]
+print("BIC Completo: ", modelo_completo.bic)
+print("BIC Melhor: ", modelo_melhor.bic)
 
-melhor_aic = float("inf")
-melhor_modelo = None
+#Multicolinearidade(Não possui problemas)
+X = modelo_melhor.model.exog
+nomes_variaveis = modelo_melhor.model.exog_names
 
-while True:
+tabela_vif = pd.DataFrame()
+tabela_vif["Variavel"] = nomes_variaveis
 
-    resultados = []
+tabela_vif["VIF"] = [variance_inflation_factor(X, i) for i in range(X.shape[1])]
 
-    for v in variaveis:
+tabela_vif["VIF"] = tabela_vif["VIF"].round(2)
 
-        candidatos = [x for x in variaveis if x != v]
-
-        formula = "Sales ~ " + " + ".join(candidatos)
-
-        modelo = smf.ols(formula, data=dt.extract()).fit()
-
-        resultados.append((modelo.aic, v, modelo))
-
-    resultados.sort()
-
-    aic, removida, modelo = resultados[0]
-
-    if aic < melhor_aic:
-
-        melhor_aic = aic
-        melhor_modelo = modelo
-        variaveis.remove(removida)
-
-    else:
-        break
-    
-print(melhor_modelo.summary())
-
-import pandas as pd
-import numpy as np
-
-modelos = {
-    "Completo": modelo_completo,
-    "Stepwise": melhor_modelo
-}
-
-comparacao = pd.DataFrame({
-    "Parâmetros": [len(m.params)-1 for m in modelos.values()],
-    "R²": [m.rsquared for m in modelos.values()],
-    "R² ajustado": [m.rsquared_adj for m in modelos.values()],
-    "RQME": [np.sqrt(m.mse_resid) for m in modelos.values()],
-    "AIC": [m.aic for m in modelos.values()],
-    "BIC": [m.bic for m in modelos.values()]
-}, index=modelos.keys())
-
-print(comparacao.round(3))
-
-anova = anova_lm(melhor_modelo, modelo_completo)
-print(anova)
+print("=== DIAGNÓSTICO DE MULTICOLINEARIDADE (VIF) ===")
+print(tabela_vif)
