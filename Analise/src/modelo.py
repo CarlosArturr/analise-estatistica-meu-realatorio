@@ -8,9 +8,9 @@ arquivo = Path(__file__).resolve().parent.parent / "dados" / "04_Carseats.csv"
 df = pd.read_csv(arquivo)
 
 #Comparando o modelo completo com o melhor encontrado
-modelo_completo = smf.ols('Sales ~ CompPrice + Income + Advertising + Population + Price + Age + Education + C(ShelveLoc) + C(Urban) + C(US)', data=df).fit()
+modelo_completo = smf.ols('Vendas ~ PreçoConcorrente + Renda + Publicidade + População + Preço + Idade + Educação + C(LocPrateleira) + C(Urbano) + C(EUA)', data=df).fit()
 
-modelo_melhor = smf.ols('Sales ~ CompPrice + Income + Advertising + Price + Age + C(ShelveLoc)', data=df).fit()
+modelo_melhor = smf.ols('Vendas ~ PreçoConcorrente + Renda + Publicidade + Preço + Idade + C(LocPrateleira)', data=df).fit()
 
 print(modelo_completo.summary())
 print(modelo_melhor.summary())

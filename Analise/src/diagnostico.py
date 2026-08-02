@@ -9,7 +9,7 @@ from scipy import stats
 arquivo = Path(__file__).resolve().parent.parent / "dados" / "04_Carseats.csv"
 df = pd.read_csv(arquivo)
 
-modelo_melhor = smf.ols('Sales ~ CompPrice + Income + Advertising + Price + Age + C(ShelveLoc)', data=df).fit()
+modelo_melhor = smf.ols('Vendas ~ PreçoConcorrente + Renda + Publicidade + Preço + Idade + C(LocPrateleira)', data=df).fit()
 
 sns.set_theme(style="whitegrid", rc={"grid.color": ".9", "axes.edgecolor": "white"})
 

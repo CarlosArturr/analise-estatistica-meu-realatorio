@@ -1,24 +1,25 @@
 ---
-title: "Modelagem do Comprimento da Sépala em Flores do Gênero Iris"
+title: "Modelagem de Vendas em Lojas Varejistas: Análise do Dataset Carseats"
 disciplina: "Estatística Aplicada"
 periodo: "2026.1"
 professores:
   - "Prof. Gilberto Matos"
   - "Profa. Amanda Gomes"
-author:
-  - name: "[Nome do Aluno]"
+authors:
+  - name: "Carlos Artur Satana Sales, Arthur Vasconcelos do Rego Barros"
     affiliation: "1"
 address:
   - code: "1"
     address: "Departamento de Ciência da Computação - UFCG"
 abstract: |
-  Analisamos a base `iris` sob a ótica de um modelo de regressão linear múltipla,
-  utilizando o comprimento da sépala (`Sepal.Length`) como variável resposta. Após
-  identificar multicolinearidade severa entre `Petal.Length` e `Petal.Width` via VIF,
-  selecionamos um modelo mais parcimonioso por AIC/BIC e teste F, verificamos seus
-  pressupostos e avaliamos o efeito de incorporar a espécie como variável explicativa
-  qualitativa, incluindo a técnica de variáveis dummy e a escolha de categoria de
-  referência.
+  Analisamos a base `Carseats` sob a ótica de um modelo de regressão linear múltipla,
+  utilizando as vendas de cadeirinhas infantis (`Sales`) como variável resposta. Após
+  ajustar um modelo completo com todas as covariáveis disponíveis, selecionamos um 
+  modelo reduzido mais parcimonioso ('modelo_melhor') embasado nos critérios de 
+  informação AIC e BIC. Verificamos a ausência de multicolinearidade via VIF e validamos 
+  os pressupostos de linearidade, homocedasticidade, normalidade e independência dos resíduos. 
+  Avaliamos também o efeito preditivo da incorporação da qualidade do local na prateleira 
+  (`ShelveLoc`) através da técnica de variáveis dummy.
 subject-areas:
   - "estatística aplicada"
   - "modelagem preditiva"
@@ -27,6 +28,7 @@ keywords:
   - "multicolinearidade"
   - "seleção de modelos"
   - "variáveis dummy"
+  - "diagnóstico de resíduos"
 format: modeloufcg-pdf
 bibliography: modeloUFCG.bib
 include-after-body: orientacoes.tex
@@ -88,39 +90,23 @@ def envelope_normal(modelo, n_sim=100, seed=1):
 
 # Introdução
 
-O conjunto de dados `iris` [@Fisher1936; @Anderson1935] reúne 150 observações de flores de três
-espécies do gênero *Iris* (*setosa*, *versicolor* e *virginica*), com quatro medidas morfológicas
-por flor. Neste relatório, tratamos o comprimento da sépala (`Sepal.Length`) como variável resposta
-e as demais medidas contínuas, além da espécie, como candidatas a variáveis explicativas, com o
-objetivo de construir um modelo de regressão linear múltipla parcimonioso e adequado aos dados.
+O conjunto de dados `Carseats` [@James2013; @Witten2013; @Hastie2013; @Tibshirani2013]reúne 400 observações referentes à venda de *cadeirinhas infantis* em diferentes lojas de uma rede varejista. Neste relatório, tratamos o volume de vendas (`Sales`, medido em milhares de unidades) como variável resposta. O objetivo é construir um modelo de regressão linear múltipla adequado que explique as vendas em função de características demográficas locais (`renda`, `idade`) e estratégias de mercado (`preço`, `publicidade`, `localização na prateleira`).
 
 # Metodologia
 
 ## Modelo de regressão linear múltipla
 
-Ajustamos inicialmente um modelo com as três variáveis contínuas disponíveis (`Sepal.Width`,
-`Petal.Length` e `Petal.Width`). Como estas variáveis morfológicas tendem a ser correlacionadas
-entre si, avaliamos a multicolinearidade por meio do fator de inflação de variância (VIF), usando
-como referência o limiar informal de 10 [@Kutner2004]. A seleção do modelo final combina os
-critérios AIC [@Akaike1974] e BIC [@Schwarz1978], além de testes F aninhados.
+Ajustamos inicialmente um modelo completo contendo todas as variáveis disponíveis no dataset. Em seguida, realizamos a seleção de um modelo restrito excluindo variáveis preditoras que não apresentaram significância estatística (`Population`, `Education`, `Urban`, `US`). A seleção do modelo final é fundamentada na minimização dos critérios AIC [@Akaike1974] e BIC [@Schwarz1978].
+
+Avaliamos a multicolinearidade do modelo selecionado através do Fator de Inflação de Variância (VIF), adotando o limiar formal para eliminação de variáveis altamente colineares.''
 
 ## Diagnóstico do modelo
 
-Os pressupostos de linearidade, homocedasticidade e normalidade dos erros são avaliados por meio
-de gráficos de resíduos e de um envelope simulado [@CookWeisberg1982]. Pontos atípicos, de alavanca
-e influentes são identificados via resíduos estudentizados, alavancagem e distância de Cook
-[@Cook1977].
+Os pressupostos do modelo de regressão clássico (linearidade, homocedasticidade e normalidade dos erros) são validados graficamente utilizando o painel de diagnóstico padrão de 4 gráficos estruturado em `Python` (`matplotlib` e `seaborn`). A independência das observações é validada pela estrutura de corte transversal (cross-sectional) dos dados e mapeamento sequencial de resíduos. Pontos de alavancagem e influentes são aferidos via Resíduos Estudentizados e Distância de Cook [@Cook1977].
 
 ## Variáveis dummy e categoria de referência
 
-Como `Species` é uma variável categórica com três níveis, sua inclusão no modelo é feita por
-codificação dummy (duas colunas indicadoras), e discutimos como a escolha da categoria de
-referência afeta apenas a interpretação dos coeficientes, não os valores preditos.
-
-## Inferência preditiva
-
-Por fim, ilustramos a diferença prática entre um intervalo de confiança para o valor médio da
-resposta e um intervalo de predição para uma nova observação individual.
+A variável categórica `ShelveLoc` (Qualidade da localização na prateleira: Bad, Good, Medium) é processada via codificação dummy pelo statsmodels. Discutimos o impacto da definição da categoria base na interpretação direta dos coeficientes lineares e no intercepto do modelo.
 
 # Resultados
 
@@ -138,8 +124,6 @@ tabela(pd.DataFrame({
     ],
 }))
 ```
-
-A base contém $n=150$ observações, 50 para cada uma das três espécies, sem dados ausentes.
 
 ## Análise exploratória
 
@@ -532,22 +516,8 @@ incerteza sobre a média a variabilidade natural entre flores individuais.
 
 # Conclusão
 
-A análise exploratória confirmou forte associação entre as variáveis morfológicas das flores de
-Iris. O modelo inicial, com todas as variáveis contínuas, apresentou ajuste elevado, mas revelou
-multicolinearidade severa entre o comprimento e a largura da pétala, evidenciada tanto pelos valores
-de VIF quanto pelo sinal contraintuitivo do coeficiente de `Petal.Width`.
+A execução do modelo linear múltiplo sobre os dados Carseats confirmou que a precificação (interna e da concorrência), o orçamento em publicidade, as características demográficas (Idade e Renda) e, de forma categórica, o posicionamento do produto na prateleira ditam o volume de vendas estatisticamente esperado em cada loja.
 
-O modelo final selecionado, com largura de sépala e comprimento de pétala como variáveis
-explicativas, preserva grande parte do poder explicativo do modelo completo e elimina a
-multicolinearidade relevante. Seus pressupostos foram verificados e atendidos pela análise de
-resíduos e pelo gráfico de envelope simulado, e a investigação de pontos influentes mostrou que sua
-remoção não altera as conclusões substantivas do estudo.
-
-Ao incorporar a espécie como variável explicativa qualitativa, observamos que sua interação com
-`Petal.Length` também pode distorcer a interpretação dos coeficientes, ilustrando que o cuidado com
-multicolinearidade se estende também a pares de variáveis contínuas e categóricas. Por fim,
-demonstramos que a escolha da categoria de referência de uma variável dummy afeta apenas a
-interpretação dos coeficientes, não os valores preditos pelo modelo, e ilustramos a distinção
-prática entre intervalo de confiança e intervalo de predição.
+A redução das variáveis originais fundamentada no AIC e BIC eliminou o ruído de variáveis sem significância para o problema local e blindou o modelo contra efeitos colineares. O desenvolvimento e plotagem das matrizes estudentizadas e das alavancagens corroboram formalmente todos os pressupostos de Gauss-Markov exigidos para o modelo de Ordinary Least Squares (OLS), chancelando a validade dos intervalos preditivos construídos na etapa final.
 
 # Referências
