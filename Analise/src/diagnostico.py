@@ -87,3 +87,66 @@ ax[1, 1].set_ylabel('Resíduo padronizado')
 plt.tight_layout()
 fig.subplots_adjust(hspace=0.6, top=0.92)
 plt.show()
+
+alavancagem = influencia.hat_matrix_diag
+distancia_cook = influencia.cooks_distance[0]
+
+n = len(alavancagem)
+p = ax.shape[1]   # número de parâmetros (incluindo intercepto, se houver)
+
+limite_alavancagem = 2 * p / n
+
+idx_alavancagem = np.where(alavancagem > limite_alavancagem)[0]
+
+limite_cook = 4 / n
+
+idx_cook = np.where(distancia_cook > limite_cook)[0]
+
+print(f"Limite de Cook (4/n): {limite_cook:.4f}")
+print(f"{len(idx_cook)} observações excedem o limite:\n")
+print(idx_cook)
+
+print("\nObservações potencialmente influentes:\n")
+
+idx_ambos = np.where(
+    (alavancagem > limite_alavancagem) &
+    (distancia_cook > limite_cook)
+)[0]
+
+print(f"{len(idx_ambos)} observações excedem ambos os critérios:")
+print(idx_ambos)
+
+obs = []
+
+for i in idx_ambos:
+    print(
+        f"Obs {i:3d} | "
+        f"Leverage={alavancagem[i]:.4f} | "
+        f"Cook={distancia_cook[i]:.4f} | "
+        f"Resíduo={residuos_padronizados[i]:.3f}"
+    )
+    obs.append(df.iloc[i])
+
+df.iloc[idx_ambos]
+
+df_diag = df.copy()
+
+df_diag["Leverage"] = alavancagem
+df_diag["Cook"] = distancia_cook
+df_diag["Resíduo Padronizado"] = residuos_padronizados
+
+df_diag.loc[idx_ambos]
+
+for i in idx_ambos:
+    ax[1, 1].annotate(
+        str(i),
+        (alavancagem[i], residuos_padronizados[i]),
+        xytext=(5, 5),
+        textcoords="offset points",
+        fontsize=8,
+        color="red",
+        fontweight="bold"
+    )
+
+for e in obs:
+    print(e)

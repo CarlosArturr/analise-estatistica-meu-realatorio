@@ -141,7 +141,7 @@ def dados_convertidos_int():
     dados_int = extract()
     dados_int["ShelveLoc"] = (
         dados_int["ShelveLoc"]
-        .map({"Bad": 1, "Medium": 2, "Good": 3})
+        .map({"Bad": 1, "Medium": 2, "Good":4})
         .astype(int)
     )
 
