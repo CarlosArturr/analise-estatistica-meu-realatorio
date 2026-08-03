@@ -13,13 +13,13 @@ address:
     address: "Departamento de Ciência da Computação - UFCG"
 abstract: |
   Analisamos a base `Carseats` sob a ótica de um modelo de regressão linear múltipla,
-  utilizando as vendas de cadeirinhas infantis (`Sales`) como variável resposta. Após
+  utilizando as vendas de cadeirinhas infantis (`Vendas`) como variável resposta. Após
   ajustar um modelo completo com todas as covariáveis disponíveis, selecionamos um 
   modelo reduzido mais parcimonioso ('modelo_melhor') embasado nos critérios de 
   informação AIC e BIC. Verificamos a ausência de multicolinearidade via VIF e validamos 
   os pressupostos de linearidade, homocedasticidade, normalidade e independência dos resíduos. 
   Avaliamos também o efeito preditivo da incorporação da qualidade do local na prateleira 
-  (`ShelveLoc`) através da técnica de variáveis dummy.
+  (`LocPrateleira`) através da técnica de variáveis dummy.
 subject-areas:
   - "estatística aplicada"
   - "modelagem preditiva"
@@ -40,13 +40,14 @@ jupyter: python3
 #| include: false
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from pathlib import Path
 from scipy import stats
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.stats.anova import anova_lm
-from sklearn import datasets
 from IPython.display import Markdown
 
 plt.rcParams["figure.dpi"] = 300
@@ -54,59 +55,134 @@ plt.rcParams["figure.dpi"] = 300
 def tabela(df, digitos=2):
     return Markdown(df.round(digitos).fillna("").to_markdown(index=False))
 
-iris = datasets.load_iris(as_frame=True).frame
-especie = pd.Categorical.from_codes(
-    iris["target"], categories=["setosa", "versicolor", "virginica"]
-)
-dados = iris.drop(columns="target").rename(columns={
-    "sepal length (cm)": "Sepal.Length",
-    "sepal width (cm)": "Sepal.Width",
-    "petal length (cm)": "Petal.Length",
-    "petal width (cm)": "Petal.Width",
-})
-dados["Species"] = especie
+def extract():
+    dados = pd.read_csv("dados/04_Carseats.csv")
+
+    dados.columns = dados.columns.str.strip()
+
+    dados["id"] = range(1, len(dados) + 1)
+
+    # Variáveis categóricas
+    categorias = ["LocPrateleira", "Urbano", "EUA"]
+
+    for coluna in categorias:
+        dados[coluna] = (
+            dados[coluna]
+            .astype(str)
+            .str.strip()
+            .astype("category")
+        )
+
+    return dados
+
+def dados_convertidos_int():
+    dados_int = extract()
+
+    dados_int["LocPrateleira"] = (
+        dados_int["LocPrateleira"]
+        .cat.reorder_categories(
+            ["Bad", "Medium", "Good"],
+            ordered=True
+        )
+        .cat.codes + 1
+    )
+
+    for coluna in ["Urbano", "EUA"]:
+        dados_int[coluna] = (
+            dados_int[coluna]
+            .cat.reorder_categories(
+                ["No", "Yes"],
+                ordered=True
+            )
+            .cat.codes
+        )
+
+    return dados_int
+
+# DataFrame principal
+dados = extract()
+
 
 def vif_manual(exog_df):
     X = sm.add_constant(exog_df)
+
     return pd.Series(
-        [variance_inflation_factor(X.values, i) for i in range(1, X.shape[1])],
+        [
+            variance_inflation_factor(X.values, i)
+            for i in range(1, X.shape[1])
+        ],
         index=exog_df.columns,
+        name="VIF"
     )
 
 def envelope_normal(modelo, n_sim=100, seed=1):
+
     rng = np.random.default_rng(seed)
+
     n = int(modelo.nobs)
     sigma = np.sqrt(modelo.mse_resid)
+
     X = modelo.model.exog
     ajustados = modelo.fittedvalues
+
     sims = np.empty((n_sim, n))
+
     for i in range(n_sim):
+
         y_sim = ajustados + rng.normal(0, sigma, n)
-        sims[i] = np.sort(sm.OLS(y_sim, X).fit().get_influence().resid_studentized_internal)
-    quantis = stats.norm.ppf((np.arange(1, n + 1) - 0.5) / n)
-    obs = np.sort(modelo.get_influence().resid_studentized_internal)
-    return quantis, obs, np.percentile(sims, 2.5, axis=0), np.percentile(sims, 97.5, axis=0)
+
+        modelo_sim = sm.OLS(y_sim, X).fit()
+
+        sims[i] = np.sort(
+            modelo_sim.get_influence().resid_studentized_internal
+        )
+
+    quantis = stats.norm.ppf(
+        (np.arange(1, n + 1) - 0.5) / n
+    )
+
+    residuos = np.sort(
+        modelo.get_influence().resid_studentized_internal
+    )
+
+    inferior = np.percentile(sims, 2.5, axis=0)
+    superior = np.percentile(sims, 97.5, axis=0)
+
+    return quantis, residuos, inferior, superior
 ```
 
 # Introdução
 
-O conjunto de dados `Carseats` [@James2013; @Witten2013; @Hastie2013; @Tibshirani2013]reúne 400 observações referentes à venda de *cadeirinhas infantis* em diferentes lojas de uma rede varejista. Neste relatório, tratamos o volume de vendas (`Sales`, medido em milhares de unidades) como variável resposta. O objetivo é construir um modelo de regressão linear múltipla adequado que explique as vendas em função de características demográficas locais (`renda`, `idade`) e estratégias de mercado (`preço`, `publicidade`, `localização na prateleira`).
+O conjunto de dados `Carseats` [@Fisher1936; @ISLR2021] reúne 400 observações referentes à venda de *cadeirinhas infantis* em diferentes lojas de uma rede varejista. Neste relatório, 
+tratamos o volume de vendas (`Sales`, 'unidades de milhares') como variável resposta. O objetivo é construir um modelo de regressão linear múltipla adequado que explique as 
+vendas em função de características demográficas locais (`renda`, `idade`) e estratégias de mercado (`preço`, `publicidade`, `localização na prateleira`).
 
 # Metodologia
 
 ## Modelo de regressão linear múltipla
 
-Ajustamos inicialmente um modelo completo contendo todas as variáveis disponíveis no dataset. Em seguida, realizamos a seleção de um modelo restrito excluindo variáveis preditoras que não apresentaram significância estatística (`Population`, `Education`, `Urban`, `US`). A seleção do modelo final é fundamentada na minimização dos critérios AIC [@Akaike1974] e BIC [@Schwarz1978].
+Ajustamos inicialmente um modelo completo contendo todas as variáveis disponíveis no dataset. Em seguida, realizamos a seleção de um modelo restrito excluindo variáveis preditoras 
+que não apresentaram significância estatística (`População`, `Educação`, `Urbano`, `EUA`). A seleção do modelo final é fundamentada na minimização dos critérios AIC [@Akaike1974] e BIC [@Schwarz1978].
 
 Avaliamos a multicolinearidade do modelo selecionado através do Fator de Inflação de Variância (VIF), adotando o limiar formal para eliminação de variáveis altamente colineares.''
 
 ## Diagnóstico do modelo
 
-Os pressupostos do modelo de regressão clássico (linearidade, homocedasticidade e normalidade dos erros) são validados graficamente utilizando o painel de diagnóstico padrão de 4 gráficos estruturado em `Python` (`matplotlib` e `seaborn`). A independência das observações é validada pela estrutura de corte transversal (cross-sectional) dos dados e mapeamento sequencial de resíduos. Pontos de alavancagem e influentes são aferidos via Resíduos Estudentizados e Distância de Cook [@Cook1977].
+Os pressupostos do modelo de regressão clássico (linearidade, homocedasticidade e normalidade dos erros) são validados graficamente por meio de
+de resíduos e de um envelope simulado feitos no `Python` utilizando (`matplotlib` e `seaborn`) [@CookWeisberg1982]. A independência das observações 
+é validada pela estrutura de corte transversal (cross-sectional) dos dados e mapeamento sequencial de resíduos. Pontos de alavancagem e influentes 
+são aferidos via Resíduos Estudentizados e Distância de Cook [@Cook1977].
 
 ## Variáveis dummy e categoria de referência
 
-A variável categórica `ShelveLoc` (Qualidade da localização na prateleira: Bad, Good, Medium) é processada via codificação dummy pelo statsmodels. Discutimos o impacto da definição da categoria base na interpretação direta dos coeficientes lineares e no intercepto do modelo.
+A variável categórica `LocPrateleira` (Qualidade da localização na prateleira: Ruim, Bom, Médio) é processada via codificação dummy pelo statsmodels. Discutimos o impacto da 
+definição da categoria base na interpretação direta dos coeficientes lineares e no intercepto do modelo.
+
+## Inferência preditiva
+
+Por fim, ilustramos a diferença prática entre um intervalo de confiança para o valor médio da
+resposta e um intervalo de predição para uma nova observação individual.
+
 
 # Resultados
 
@@ -114,124 +190,332 @@ A variável categórica `ShelveLoc` (Qualidade da localização na prateleira: B
 
 ```{python}
 #| label: tbl-descricao
-#| tbl-cap: "Variáveis da base de dados iris."
+#| tbl-cap: "Variáveis da base de dados Carseats."
+
 tabela(pd.DataFrame({
-    "Variável": ["Sepal.Length", "Sepal.Width", "Petal.Length", "Petal.Width", "Species"],
-    "Descrição": [
-        "Comprimento da sépala (cm)", "Largura da sépala (cm)",
-        "Comprimento da pétala (cm)", "Largura da pétala (cm)",
-        "Espécie (setosa, versicolor, virginica)",
+    "Variável": [
+        "Vendas",
+        "PreçoConcorrente",
+        "Renda",
+        "Publicidade",
+        "População",
+        "Preço",
+        "LocPrateleira",
+        "Idade",
+        "Educação",
+        "Urbano",
+        "EUA",
     ],
+    "Descrição": [
+        "Vendas unitárias (milhares)",
+        "Preço praticado pelo concorrente",
+        "Renda da população local (milhares de dólares)",
+        "Investimento em publicidade",
+        "População da região (milhares de habitantes)",
+        "Preço praticado pela empresa",
+        "Qualidade da localização na prateleira",
+        "Idade média da população",
+        "Escolaridade média da população",
+        "Indica se a loja está em área urbana",
+        "Indica se a loja está localizada nos EUA",
+    ]
 }))
 ```
+
+A base de dados é composta por 400 observações e 12 variáveis, sendo formada por variáveis quantitativas e categóricas. Entre as variáveis qualitativas, 
+a variável LocPrateleira apresenta três categorias: Ruim, Médio e Bom; enquanto Urbano e EUA possuem duas categorias cada, representadas por Yes e No.
+ Não foram identificados valores ausentes na base, garantindo que todas as observações estejam disponíveis para as etapas de análise exploratória e modelagem estatística.
+
+## Estatísticas descritivas
+
+```{python}
+#| label: tbl-descritivas
+#| tbl-cap: "Estatísticas descritivas das variáveis numéricas."
+
+descritivas = (
+    dados.drop(columns="id")
+         .select_dtypes(include="number")
+         .describe()
+         .T
+         .reset_index(names="Variável")
+)
+
+descritivas = descritivas.rename(columns={
+    "count": "n",
+    "mean": "Média",
+    "std": "Desvio-padrão",
+    "min": "Mínimo",
+    "25%": "1º Quartil",
+    "50%": "Mediana",
+    "75%": "3º Quartil",
+    "max": "Máximo"
+})
+
+tabela(descritivas)
+```
+
+A Tabela 3 apresenta as estatísticas descritivas das variáveis numéricas da base de dados. 
+Observa-se que as variáveis apresentam escalas distintas, refletindo diferentes características 
+das lojas analisadas. A variável resposta Vendas possui média de aproximadamente 7,5 unidades, 
+com valores variando entre 0 e 18, indicando uma dispersão considerável entre os desempenhos de venda das lojas.
 
 ## Análise exploratória
 
 ```{python}
-#| label: tbl-descritivas
-#| tbl-cap: "Estatísticas descritivas das variáveis contínuas."
-dados.describe().round(2).T[["mean", "std", "min", "max"]]
-```
+#| label: tbl-resumo-descritivas
+#| tbl-cap: "Resumo das estatísticas descritivas das variáveis numéricas."
 
-```{python}
-#| label: fig-boxplots
-#| fig-cap: "Distribuição do comprimento da sépala por espécie."
-fig, ax = plt.subplots(figsize=(4.5, 2.9))
-dados.boxplot(column="Sepal.Length", by="Species", ax=ax)
-ax.set_title("")
-plt.suptitle("")
-ax.set_xlabel("Espécie")
-ax.set_ylabel("Sepal.Length (cm)")
+descritivas = (
+    dados.drop(columns="id")
+         .select_dtypes(include="number")
+         .describe()
+         .T[["mean", "std", "min", "max"]]
+         .rename(columns={
+             "mean": "Média",
+             "std": "Desvio-padrão",
+             "min": "Mínimo",
+             "max": "Máximo"
+         })
+         .reset_index(names="Variável")
+)
+
+tabela(descritivas)
+
+#| label: fig-boxplot-prateleira
+#| fig-cap: "Distribuição das vendas segundo a qualidade da localização na prateleira."
+
+fig, ax = plt.subplots(figsize=(6,4))
+
+cores = {
+    "Bad": "#cb3028",
+    "Medium": "#f7cd5c",
+    "Good": "#1d874b"
+}
+
+sns.boxplot(
+    data=dados,
+    x="LocPrateleira",
+    y="Vendas",
+    order=["Bad", "Medium", "Good"],
+    palette=cores,
+    ax=ax
+)
+
+sns.stripplot(
+    data=dados,
+    x="LocPrateleira",
+    y="Vendas",
+    order=["Bad", "Medium", "Good"],
+    color="black",
+    alpha=0.4,
+    jitter=0.2,
+    ax=ax
+)
+
+ax.set_xlabel("Qualidade da prateleira")
+ax.set_ylabel("Vendas (milhares de unidades)")
+
 plt.show()
 ```
+A Figura -@fig-boxplot-prateleira apresenta a distribuição das vendas em função da qualidade da localização na prateleira. Observa-se que lojas classificadas como **Good** 
+tendem a apresentar maiores níveis de vendas e maior variabilidade. As lojas com classificação **Medium** apresentam valores intermediários, enquanto aquelas classificadas 
+como **Bad** concentram as menores vendas, sugerindo uma associação positiva entre a qualidade da exposição do produto e o desempenho das vendas.
 
-A Figura -@fig-boxplots sugere que *virginica* tende a ter sépalas mais compridas, seguida por
-*versicolor* e, por último, *setosa*.
 
 ### Análise de correlação
 
 ```{python}
-#| label: fig-corr
-#| fig-cap: "Matriz de correlação de Pearson entre as variáveis morfológicas."
-cont = dados.drop(columns="Species")
-corr = cont.corr()
-fig, ax = plt.subplots(figsize=(4, 3.2))
-im = ax.imshow(corr, vmin=-1, vmax=1, cmap="RdBu_r")
-ax.set_xticks(range(len(corr.columns)), corr.columns, rotation=45, ha="right")
-ax.set_yticks(range(len(corr.columns)), corr.columns)
-for i in range(len(corr.columns)):
-    for j in range(len(corr.columns)):
-        ax.text(j, i, f"{corr.iloc[i, j]:.2f}", ha="center", va="center", fontsize=8)
-fig.colorbar(im, shrink=0.8)
+#| label: tbl-correlacao
+#| tbl-cap: "Matriz de correlação de Pearson entre as variáveis numéricas."
+
+numericas = (
+    dados
+    .select_dtypes(include="number")
+    .drop(columns="id")
+)
+
+matriz_cor = numericas.corr()
+
+tabela(matriz_cor.reset_index(names="Variável"))
+```
+
+```{python}
+#| label: fig-correlacao-spearman
+#| fig-cap: "Matriz de correlação de Spearman entre as variáveis numéricas e as variáveis categóricas codificadas."
+
+dados_corr = dados_convertidos_int()
+
+matriz_spearman = (
+    dados_corr
+    .select_dtypes(include="number")
+    .drop(columns="id")
+    .corr(method="spearman")
+)
+
+fig, ax = plt.subplots(figsize=(8, 6))
+
+sns.heatmap(
+    matriz_spearman,
+    annot=True,
+    fmt=".2f",
+    cmap="coolwarm",
+    center=0,
+    vmin=-1,
+    vmax=1,
+    linewidths=0.5,
+    square=True,
+    cbar_kws={"label": "Correlação"},
+    ax=ax
+)
+
+ax.set_title("Matriz de Correlação de Spearman")
+
 plt.show()
 ```
 
-A variável resposta `Sepal.Length` não apresenta correlação linear relevante com `Sepal.Width`
-($r \approx -0{,}12$), mas correlaciona-se fortemente com `Petal.Length` ($r \approx 0{,}87$) e
-`Petal.Width` ($r \approx 0{,}82$). Entre as próprias explicativas, `Petal.Length` e `Petal.Width`
-apresentam correlação muito forte ($r \approx 0{,}96$), o que já é um indício de multicolinearidade
-a ser confirmado pelo VIF.
+A Figura -@fig-correlacao apresenta a matriz de correlação de Pearson entre as variáveis numéricas da base de dados. Observa-se que algumas variáveis apresentam associação 
+linear moderada, enquanto outras possuem correlação próxima de zero. Em especial, espera-se que as Vendas estejam negativamente correlacionadas com o Preço e positivamente 
+correlacionadas com a Publicidade e a Renda, embora a intensidade dessas relações deva ser confirmada pelos coeficientes estimados no modelo de regressão. Além disso, 
+correlações elevadas entre variáveis explicativas podem indicar a presença de multicolinearidade, aspecto posteriormente avaliado pelo fator de inflação da variância (VIF).
 
-### Multicolinearidade: o VIF
+## Multicolinearidade: o VIF
 
 ```{python}
 #| label: tbl-modeloCompleto
-#| tbl-cap: "Estimativas do modelo inicial (sem a espécie)."
-modelo1 = smf.ols("Q('Sepal.Length') ~ Q('Sepal.Width') + Q('Petal.Length') + Q('Petal.Width')",
-                   data=dados).fit()
-modelo1.summary2().tables[1].round(4)
+#| tbl-cap: "Estimativas do modelo inicial completo."
+
+modelo_completo = smf.ols(
+    "Vendas ~ PreçoConcorrente + Renda + Publicidade + População + "
+    "Preço + Idade + Educação + C(LocPrateleira) + C(Urbano) + C(EUA)",
+    data=dados
+).fit()
+
+modelo_completo.summary2().tables[1].round(4)
 ```
 
 ```{python}
 #| label: tbl-vif
-#| tbl-cap: "Fator de inflação de variância (VIF) de cada variável explicativa no modelo inicial."
-vif_manual(dados[["Sepal.Width", "Petal.Length", "Petal.Width"]]).rename("VIF").round(2).to_frame()
+#| tbl-cap: "Fator de inflação da variância (VIF) das variáveis explicativas."
+
+variaveis_vif = [
+    "PreçoConcorrente",
+    "Renda",
+    "Publicidade",
+    "População",
+    "Preço",
+    "Idade",
+    "Educação"
+]
+
+vif_resultado = (
+    vif_manual(dados[variaveis_vif])
+    .rename("VIF")
+    .round(2)
+    .to_frame()
+)
+
+tabela(vif_resultado.reset_index(names="Variável"))
 ```
 
-O modelo inicial apresenta ajuste elevado ($R^2$ ajustado $=$ `{python} float(round(modelo1.rsquared_adj, 4))`),
-mas o VIF de `Petal.Length` e `Petal.Width` (acima de 14) confirma multicolinearidade severa entre
-essas duas variáveis, muito acima do limiar de referência de 10. Um segundo indício é o sinal
-negativo do coeficiente de `Petal.Width`, contraintuitivo dado que ambas as variáveis se
-correlacionam positivamente com a resposta: consequência típica de multicolinearidade, que torna as
-estimativas individuais instáveis mesmo com o ajuste global permanecendo bom.
+O diagnóstico de multicolinearidade foi realizado utilizando o fator de inflação da variância (VIF). Valores elevados de VIF indicam que uma variável explicativa apresenta 
+forte relação linear com as demais variáveis do modelo, aumentando a variância dos estimadores.
+
+A Tabela -@tbl-vif apresenta os valores de VIF para as variáveis quantitativas do modelo inicial. Observa-se que todas as variáveis apresentam valores inferiores ao limite 
+de referência de 10, indicando ausência de problemas severos de multicolinearidade. Dessa forma, as estimativas dos coeficientes permanecem estáveis quanto à presença de correlação entre os preditores.
+
 
 ## Seleção do modelo final
 
 ```{python}
 #| label: tbl-selecao
 #| tbl-cap: "Comparação dos modelos candidatos: ajuste, AIC e BIC."
-modelo2 = smf.ols("Q('Sepal.Length') ~ Q('Sepal.Width') + Q('Petal.Length')", data=dados).fit()
-modelo3 = smf.ols("Q('Sepal.Length') ~ Q('Sepal.Width') + Q('Petal.Width')", data=dados).fit()
-tabela(pd.DataFrame({
-    "Modelo": ["modelo1 (completo)", "modelo2 (sem Petal.Width)", "modelo3 (sem Petal.Length)"],
-    "R² ajustado": [modelo1.rsquared_adj, modelo2.rsquared_adj, modelo3.rsquared_adj],
-    "AIC": [modelo1.aic, modelo2.aic, modelo3.aic],
-    "BIC": [modelo1.bic, modelo2.bic, modelo3.bic],
-}))
+
+modelo_completo = smf.ols(
+    "Vendas ~ PreçoConcorrente + Renda + Publicidade + População + "
+    "Preço + Idade + Educação + C(LocPrateleira) + C(Urbano) + C(EUA)",
+    data=dados
+).fit()
+
+
+modelo_reduzido = smf.ols(
+    "Vendas ~ PreçoConcorrente + Renda + Publicidade + "
+    "Preço + Idade + C(LocPrateleira)",
+    data=dados
+).fit()
+
+
+comparacao = pd.DataFrame({
+    "Modelo": [
+        "Modelo completo",
+        "Modelo reduzido"
+    ],
+    "R² ajustado": [
+        modelo_completo.rsquared_adj,
+        modelo_reduzido.rsquared_adj
+    ],
+    "AIC": [
+        modelo_completo.aic,
+        modelo_reduzido.aic
+    ],
+    "BIC": [
+        modelo_completo.bic,
+        modelo_reduzido.bic
+    ]
+})
+
+tabela(comparacao)
 ```
 
-O modelo2 (sem `Petal.Width`) apresenta AIC e BIC menores que o modelo3, com diferença muito
-superior a 10 em ambos os critérios, evidência forte de que é o modelo preferível. Isto é coerente
-com a análise de correlação: `Petal.Width` correlaciona-se um pouco menos com a resposta do que
-`Petal.Length`, de modo que, entre as duas variáveis colineares, é preferível manter a mais
-associada a `Sepal.Length`.
+A comparação entre os modelos foi realizada utilizando o coeficiente de determinação ajustado
+($R^2$ ajustado), além dos critérios de informação de Akaike (AIC) e Bayesiano (BIC). Valores
+menores de AIC e BIC indicam modelos mais parcimoniosos, equilibrando qualidade de ajuste e
+complexidade.
+
+O modelo reduzido apresenta ajuste comparável ao modelo completo, com menor complexidade 
+estrutural. A redução do número de variáveis explicativas resulta em um modelo mais parcimonioso, 
+mantendo capacidade explicativa semelhante segundo os critérios avaliados.
 
 ```{python}
-#| label: tbl-anova2
-#| tbl-cap: "Teste F comparando o modelo2 ao modelo completo (modelo1)."
-tab_anova2 = anova_lm(modelo2, modelo1).rename(
-    columns={"df_resid": "GL Res.", "ssr": "SQ Res.", "df_diff": "GL", "ss_diff": "SQ",
-             "F": "Estatística F", "Pr(>F)": "p-valor"}
+#| label: tbl-anova-modelos
+#| tbl-cap: "Teste F comparando o modelo reduzido ao modelo completo."
+
+tab_anova = anova_lm(
+    modelo_reduzido,
+    modelo_completo
 )
-tab_anova2.insert(0, "Modelo", ["modelo2", "modelo1"])
-tabela(tab_anova2, digitos=4)
+
+tab_anova = tab_anova.rename(
+    columns={
+        "df_resid": "GL Res.",
+        "ssr": "SQ Res.",
+        "df_diff": "GL",
+        "ss_diff": "SQ",
+        "F": "Estatística F",
+        "Pr(>F)": "p-valor"
+    }
+)
+
+tabela(
+    tab_anova.reset_index()
+)
 ```
 
-O teste F rejeita a hipótese nula de que o submodelo sem `Petal.Width` explica tão bem quanto o
-modelo completo ($p<0{,}001$), ou seja, a variável é individualmente significante, ainda que sua
-presença simultânea com `Petal.Length` cause o problema de multicolinearidade discutido acima.
+O teste F foi utilizado para verificar se a remoção das variáveis presentes no modelo 
+completo provoca perda significativa de capacidade explicativa. Caso o teste não 
+rejeite a hipótese nula, o modelo reduzido é considerado equivalente ao modelo 
+completo, sendo preferível devido à sua maior parcimônia.
+
+#| label: tbl-modelo-final
+#| tbl-cap: "Estimativas dos coeficientes do modelo final selecionado."
+
+```{python}
+modelo_final = modelo_reduzido
+
+modelo_final.summary2().tables[1].round(4)
+```
 
 ### Seleção automática (eliminação retroativa por AIC)
+
 
 O `statsmodels` não possui uma função equivalente ao `step()` do R; reproduzimos a mesma lógica de
 eliminação retroativa manualmente, removendo a cada passo a variável cuja remoção resulta no maior
@@ -239,285 +523,624 @@ ganho de AIC, e parando quando nenhuma remoção melhora o critério:
 
 ```{python}
 #| echo: true
-def selecao_retroativa(formula_completa, dados, resposta):
-    termos = formula_completa
-    modelo_atual = smf.ols(f"Q('{resposta}') ~ " + " + ".join(f"Q('{t}')" for t in termos),
-                            data=dados).fit()
-    print(f"Início: AIC = {modelo_atual.aic:.2f}  |  termos: {termos}")
+
+def selecao_retroativa(termos, dados, resposta):
+
+    termos = termos.copy()
+
+    modelo_atual = smf.ols(
+        f"{resposta} ~ " + " + ".join(termos),
+        data=dados
+    ).fit()
+
+    print(
+        f"Início: AIC = {modelo_atual.aic:.2f}"
+    )
+
     while True:
-        aics = {}
+
+        candidatos = {}
+
         for termo in termos:
-            restantes = [t for t in termos if t != termo]
-            f = f"Q('{resposta}') ~ " + " + ".join(f"Q('{t}')" for t in restantes)
-            aics[termo] = smf.ols(f, data=dados).fit().aic
-        melhor_termo = min(aics, key=aics.get)
-        if aics[melhor_termo] >= modelo_atual.aic:
-            print("Nenhuma remoção melhora o AIC. Processo encerrado.")
+
+            restantes = [
+                t for t in termos
+                if t != termo
+            ]
+
+            modelo = smf.ols(
+                f"{resposta} ~ " + " + ".join(restantes),
+                data=dados
+            ).fit()
+
+            candidatos[termo] = modelo.aic
+
+
+        melhor_remocao = min(
+            candidatos,
+            key=candidatos.get
+        )
+
+
+        if candidatos[melhor_remocao] >= modelo_atual.aic:
+            print(
+                "Nenhuma remoção melhora o AIC."
+            )
             break
-        termos = [t for t in termos if t != melhor_termo]
-        modelo_atual = smf.ols(f"Q('{resposta}') ~ " + " + ".join(f"Q('{t}')" for t in termos),
-                                data=dados).fit()
-        print(f"- Remove {melhor_termo}: AIC = {modelo_atual.aic:.2f}  |  termos: {termos}")
+
+
+        termos.remove(melhor_remocao)
+
+        modelo_atual = smf.ols(
+            f"{resposta} ~ " + " + ".join(termos),
+            data=dados
+        ).fit()
+
+
+        print(
+            f"Remove {melhor_remocao}: "
+            f"AIC = {modelo_atual.aic:.2f}"
+        )
+
+
     return modelo_atual
 
-_ = selecao_retroativa(["Sepal.Width", "Petal.Length", "Petal.Width"], dados, "Sepal.Length")
+
+modelo_aic = selecao_retroativa(
+    [
+        "PreçoConcorrente",
+        "Renda",
+        "Publicidade",
+        "População",
+        "Preço",
+        "Idade",
+        "Educação",
+    ],
+    dados,
+    "Vendas"
+)
 ```
 
-Assim como no procedimento `stepwise` do R, o critério puramente preditivo (AIC) não recomenda a
-remoção de nenhuma variável: o modelo completo já é o ótimo local por esse critério, mesmo colinear.
-Como o objetivo aqui inclui interpretar os efeitos individuais, optamos por seguir com o modelo2, que
-resolve a multicolinearidade a um custo mínimo de ajuste (Tabela -@tbl-selecao).
+O procedimento de eliminação retroativa baseado no critério AIC foi utilizado como uma estratégia
+de seleção automática de variáveis. O método busca encontrar um equilíbrio entre qualidade de
+ajuste e complexidade do modelo, penalizando modelos com excesso de parâmetros.
+
+O modelo selecionado pelo AIC foi comparado com os modelos candidatos avaliados anteriormente. A
+seleção automática serviu como uma análise complementar, enquanto a decisão final considerou
+também a interpretação dos coeficientes e os diagnósticos de adequação do modelo.
 
 ## Diagnóstico do modelo selecionado
 
 ```{python}
-#| label: tbl-modelo2
-#| tbl-cap: "Estimativas dos coeficientes do modelo2 (modelo selecionado)."
-modelo2.summary2().tables[1].round(4)
-```
-
-```{python}
 #| label: fig-diagnostico
-#| fig-cap: "Análise de resíduos do modelo2."
-fig, axes = plt.subplots(2, 2, figsize=(6.5, 5))
-ajustados = modelo2.fittedvalues
-residuos = modelo2.resid
-res_pad = modelo2.get_influence().resid_studentized_internal
+#| fig-cap: "Análise dos resíduos do modelo final."
 
-axes[0, 0].scatter(ajustados, residuos, alpha=0.6)
-axes[0, 0].axhline(0, color="grey", lw=0.8)
-axes[0, 0].set_xlabel("Valores ajustados"); axes[0, 0].set_ylabel("Resíduos")
+fig, axes = plt.subplots(
+    2, 2,
+    figsize=(6.5, 5)
+)
 
-sm.qqplot(res_pad, line="45", ax=axes[0, 1])
-axes[0, 1].set_title("")
+modelo_final = modelo_reduzido
 
-axes[1, 0].scatter(ajustados, np.sqrt(np.abs(res_pad)), alpha=0.6)
-axes[1, 0].set_xlabel("Valores ajustados"); axes[1, 0].set_ylabel(r"$\sqrt{|Resíduos\ padr.|}$")
+ajustados = modelo_final.fittedvalues
+residuos = modelo_final.resid
 
-alavancagem = modelo2.get_influence().hat_matrix_diag
-axes[1, 1].scatter(alavancagem, res_pad, alpha=0.6)
-axes[1, 1].axhline(0, color="grey", lw=0.8)
-axes[1, 1].set_xlabel("Alavancagem"); axes[1, 1].set_ylabel("Resíduos padronizados")
+res_pad = (
+    modelo_final
+    .get_influence()
+    .resid_studentized_internal
+)
+
+
+# Resíduos x ajustados
+
+axes[0,0].scatter(
+    ajustados,
+    residuos,
+    alpha=0.6
+)
+
+axes[0,0].axhline(
+    0,
+    color="grey",
+    lw=0.8
+)
+
+axes[0,0].set_xlabel(
+    "Valores ajustados"
+)
+
+axes[0,0].set_ylabel(
+    "Resíduos"
+)
+
+
+# QQ plot
+
+sm.qqplot(
+    res_pad,
+    line="45",
+    ax=axes[0,1]
+)
+
+axes[0,1].set_title("")
+
+
+# Escala-localização
+
+axes[1,0].scatter(
+    ajustados,
+    np.sqrt(np.abs(res_pad)),
+    alpha=0.6
+)
+
+axes[1,0].set_xlabel(
+    "Valores ajustados"
+)
+
+axes[1,0].set_ylabel(
+    r"$\sqrt{|Resíduos\ padronizados|}$"
+)
+
+
+# Alavancagem
+
+alavancagem = (
+    modelo_final
+    .get_influence()
+    .hat_matrix_diag
+)
+
+
+axes[1,1].scatter(
+    alavancagem,
+    res_pad,
+    alpha=0.6
+)
+
+axes[1,1].axhline(
+    0,
+    color="grey",
+    lw=0.8
+)
+
+axes[1,1].set_xlabel(
+    "Alavancagem"
+)
+
+axes[1,1].set_ylabel(
+    "Resíduos padronizados"
+)
+
 
 plt.tight_layout()
-plt.show()
-```
 
-```{python}
+plt.show()
+
 #| label: fig-envelope
-#| fig-cap: "Gráfico de envelope simulado do modelo2."
-q, obs, low, up = envelope_normal(modelo2)
-fig, ax = plt.subplots(figsize=(4.5, 3.5))
-ax.plot(q, low, color="black", lw=0.8)
-ax.plot(q, up, color="black", lw=0.8)
-ax.plot(q, (low + up) / 2, "--", color="black", lw=0.8)
-ax.scatter(q, obs, s=12)
-ax.set_xlabel("Quantis teóricos N(0,1)"); ax.set_ylabel("Resíduos")
+#| fig-cap: "Gráfico de envelope simulado do modelo final."
+
+q, obs, low, up = envelope_normal(modelo_final)
+
+
+fig, ax = plt.subplots(
+    figsize=(4.5,3.5)
+)
+
+
+ax.plot(
+    q,
+    low,
+    color="black",
+    lw=0.8
+)
+
+ax.plot(
+    q,
+    up,
+    color="black",
+    lw=0.8
+)
+
+ax.plot(
+    q,
+    (low+up)/2,
+    "--",
+    color="black",
+    lw=0.8
+)
+
+ax.scatter(
+    q,
+    obs,
+    s=12
+)
+
+
+ax.set_xlabel(
+    "Quantis teóricos N(0,1)"
+)
+
+ax.set_ylabel(
+    "Resíduos"
+)
+
+
 plt.show()
 ```
 
-As Figuras -@fig-diagnostico e -@fig-envelope não indicam padrões sistemáticos relevantes nos
-resíduos, e a grande maioria dos pontos permanece dentro da banda do envelope simulado, dando
-suporte às suposições de linearidade, variância constante e normalidade dos erros.
+As análises gráficas dos resíduos indicam que o modelo final apresenta comportamento compatível
+com as principais suposições da regressão linear. Não foram observados padrões sistemáticos no
+gráfico de resíduos versus valores ajustados, sugerindo adequação da relação linear.
+
+O gráfico de escala-localização não apresenta evidências fortes de heterocedasticidade, enquanto
+o envelope normal mostra que a maior parte dos resíduos permanece dentro da região esperada,
+fornecendo suporte à hipótese de normalidade dos erros.
 
 ### Identificação de pontos atípicos, de alavanca e influentes
 
 ```{python}
 #| label: tbl-influencia
-#| tbl-cap: "Observações atípicas, de alavanca e/ou influentes segundo o modelo2."
-infl = modelo2.get_influence()
-n, p = modelo2.nobs, modelo2.df_model + 1
+#| tbl-cap: "Observações atípicas, de alavanca e/ou influentes segundo o modelo final."
+
+infl = modelo_final.get_influence()
+
+n = int(modelo_final.nobs)
+p = int(modelo_final.df_model + 1)
+
 limiar_alav = 2 * p / n
 limiar_cook = 4 / n
+
+
 tab_infl = pd.DataFrame({
-    "Espécie": dados["Species"].values,
+    "ID": dados["id"].values,
     "Resíduo estud.": infl.resid_studentized_internal,
     "Alavancagem": infl.hat_matrix_diag,
     "Dist. de Cook": infl.cooks_distance[0],
 })
-tab_infl["Atípico"] = tab_infl["Resíduo estud."].abs() > 2
-tab_infl["Alavanca"] = tab_infl["Alavancagem"] > limiar_alav
-tab_infl["Influente"] = tab_infl["Dist. de Cook"] > limiar_cook
-tab_infl.round(4).loc[tab_infl[["Atípico", "Alavanca", "Influente"]].any(axis=1)] \
-    .sort_values("Dist. de Cook", ascending=False)
+
+
+tab_infl["Atípico"] = (
+    tab_infl["Resíduo estud."].abs() > 2
+)
+
+tab_infl["Alavanca"] = (
+    tab_infl["Alavancagem"] > limiar_alav
+)
+
+tab_infl["Influente"] = (
+    tab_infl["Dist. de Cook"] > limiar_cook
+)
+
+
+tabela(
+    tab_infl
+    .round(4)
+    .loc[
+        tab_infl[
+            ["Atípico", "Alavanca", "Influente"]
+        ].any(axis=1)
+    ]
+    .sort_values(
+        "Dist. de Cook",
+        ascending=False
+    )
+)
 ```
 
-Com $n=150$ observações e $p=3$ parâmetros, o limiar de alavanca é $2p/n \approx 0{,}04$ e o de
-Cook é $4/n \approx 0{,}027$.
+Foram avaliadas observações potencialmente atípicas, de alta alavancagem e influentes utilizando
+os resíduos studentizados, a medida de alavancagem e a distância de Cook.
+
+Considerando $n=$ `{python} int(modelo_final.nobs)` observações e
+$p=$ `{python} int(modelo_final.df_model+1)` parâmetros estimados, os limites utilizados foram
+$2p/n$ para alavancagem e $4/n$ para distância de Cook.
+
+As observações identificadas pelos critérios acima foram analisadas para verificar seu impacto
+sobre as estimativas do modelo.
 
 ### Impacto da remoção dos pontos influentes
 
 ```{python}
 #| label: tbl-refinado
-#| tbl-cap: "Comparação das estimativas antes e depois da remoção dos pontos influentes."
-influentes = tab_infl.index[tab_infl["Influente"]]
-modelo2_refinado = smf.ols("Q('Sepal.Length') ~ Q('Sepal.Width') + Q('Petal.Length')",
-                            data=dados.drop(index=influentes)).fit()
-pd.DataFrame({
-    "modelo2 (completo)": modelo2.params,
-    "modelo2 (refinado)": modelo2_refinado.params,
-}).round(3).assign(
-    **{"Diferença (%)": lambda d: (
-        (d["modelo2 (refinado)"] - d["modelo2 (completo)"]) / d["modelo2 (completo)"] * 100
-    ).round(2)}
+#| tbl-cap: "Comparação dos coeficientes antes e depois da remoção das observações influentes."
+
+influentes = tab_infl.index[
+    tab_infl["Influente"]
+]
+
+
+modelo_refinado = smf.ols(
+    "Vendas ~ PreçoConcorrente + Renda + Publicidade + "
+    "Preço + Idade + C(LocPrateleira)",
+    data=dados.drop(index=influentes)
+).fit()
+
+
+comparacao_coef = pd.DataFrame({
+    "Modelo final": modelo_final.params,
+    "Modelo refinado": modelo_refinado.params
+})
+
+
+comparacao_coef["Diferença (%)"] = (
+    (
+        comparacao_coef["Modelo refinado"]
+        -
+        comparacao_coef["Modelo final"]
+    )
+    /
+    comparacao_coef["Modelo final"]
+    *
+    100
+).round(2)
+
+
+tabela(
+    comparacao_coef.round(3).reset_index()
 )
 ```
 
-As variações nos coeficientes são modestas, indicando que as observações influentes refletem
-variabilidade natural dos dados e não erros de medição; optamos por manter todas as observações no
-modelo final.
+A análise do impacto das observações influentes foi realizada comparando as estimativas dos
+coeficientes do modelo final com aquelas obtidas após a remoção das observações indicadas pela
+distância de Cook.
+
+Caso as diferenças entre os coeficientes sejam pequenas, conclui-se que as observações detectadas
+não possuem influência excessiva sobre o ajuste do modelo. Dessa forma, elas podem ser mantidas,
+pois representam variações naturais presentes na amostra.
+
+Caso ocorram alterações relevantes, recomenda-se investigar individualmente essas observações,
+verificando possíveis erros de coleta ou características específicas dos estabelecimentos.
 
 ## Interpretações do modelo selecionado
 
-O modelo2 explica uma proporção estatisticamente significante e substancial da variância de
-`Sepal.Length` ($R^2$ ajustado $=$ `{python} float(round(modelo2.rsquared_adj, 3))`). Mantendo a outra
-variável constante, cada centímetro adicional em `Sepal.Width` e em `Petal.Length` aumenta,
-respectivamente, o comprimento médio esperado da sépala em `{python} float(round(modelo2.params["Q('Sepal.Width')"], 3))`
-cm e `{python} float(round(modelo2.params["Q('Petal.Length')"], 3))` cm. Note que ambos os efeitos são
-positivos e coerentes com a análise de correlação, ao contrário do que ocorria no modelo inicial com
-as três variáveis contínuas, confirmando que a remoção de `Petal.Width` resolveu a instabilidade
-causada pela multicolinearidade.
+O modelo final explica uma proporção estatisticamente significante e relevante da variância de
+`Vendas` ($R^2$ ajustado $=$ `{python} float(round(modelo_final.rsquared_adj, 3))`).
+
+Mantendo as demais variáveis constantes, um aumento de uma unidade em `PreçoConcorrente`,
+`Renda`, `Publicidade`, `Preço` e `Idade` altera, respectivamente, o valor esperado das vendas em:
+
+`{python} float(round(modelo_final.params["PreçoConcorrente"], 3))`,
+`{python} float(round(modelo_final.params["Renda"], 3))`,
+`{python} float(round(modelo_final.params["Publicidade"], 3))`,
+`{python} float(round(modelo_final.params["Preço"], 3))`
+e
+`{python} float(round(modelo_final.params["Idade"], 3))`
+unidades de venda.
+
+Além disso, considerando a variável categórica `LocPrateleira`, os coeficientes representam a
+diferença esperada nas vendas em relação à categoria de referência utilizada pelo modelo.
+
+Os sinais dos coeficientes indicam a direção dos efeitos estimados e devem ser interpretados em
+conjunto com seus respectivos níveis de significância. O modelo final apresenta uma relação mais
+parcimoniosa entre capacidade explicativa e complexidade, mantendo as variáveis mais relevantes
+para explicar a variação das vendas.
 
 ### Coeficientes padronizados
 
 ```{python}
 #| echo: true
-padronizados = dados[["Sepal.Length", "Sepal.Width", "Petal.Length"]].apply(stats.zscore)
-modelo2_beta = smf.ols("Q('Sepal.Length') ~ Q('Sepal.Width') + Q('Petal.Length') - 1",
-                        data=padronizados).fit()
-modelo2_beta.params
+
+variaveis_quantitativas = [
+    "Vendas",
+    "PreçoConcorrente",
+    "Renda",
+    "Publicidade",
+    "Preço",
+    "Idade"
+]
+
+dados_padronizados = dados[variaveis_quantitativas].apply(stats.zscore)
+
+modelo_beta = smf.ols(
+    "Vendas ~ PreçoConcorrente + Renda + Publicidade + Preço + Idade",
+    data=dados_padronizados
+).fit()
+
+modelo_beta.params.round(3)
 ```
 
-Os coeficientes padronizados indicam que `Petal.Length` tem peso relativo consideravelmente maior
-do que `Sepal.Width` na explicação do comprimento da sépala, uma vez colocadas na mesma escala.
+Os coeficientes padronizados permitem comparar a importância relativa das variáveis explicativas,
+pois todas estão representadas na mesma escala de desvio padrão.
 
-## Regressão com variáveis dummy (a espécie como explicativa)
+O maior coeficiente em valor absoluto indica a variável com maior contribuição relativa para a
+explicação das vendas. Dessa forma, variáveis com coeficientes padronizados mais elevados possuem
+maior associação com a variável resposta quando comparadas às demais preditoras quantitativas.
 
-Até aqui, o modelo selecionado não incluiu a espécie da flor. O `patsy` (usado internamente pela
-API de fórmulas do `statsmodels`) codifica automaticamente uma variável categórica como variáveis
-dummy, tomando a primeira categoria (`setosa`) como referência:
+## Regressão com variável categórica (qualidade da prateleira como explicativa)
+
+Além das variáveis quantitativas, o modelo final inclui a variável categórica `LocPrateleira`.
+O `patsy` (utilizado internamente pelo `statsmodels`) realiza automaticamente a codificação por
+variáveis dummy, utilizando uma categoria como referência:
 
 ```{python}
 #| echo: true
-dados["Species"].cat.categories
-pd.get_dummies(dados["Species"], drop_first=True).head(6)
+
+dados["LocPrateleira"].unique()
+
+pd.get_dummies(
+    dados["LocPrateleira"],
+    drop_first=True
+).head()
 ```
 
 ```{python}
-#| label: tbl-comEspecie
-#| tbl-cap: "Estimativas do modelo com Sepal.Width, Petal.Length e Species."
-modelo4 = smf.ols("Q('Sepal.Length') ~ Q('Sepal.Width') + Q('Petal.Length') + Species",
-                   data=dados).fit()
-modelo4.summary2().tables[1].round(4)
+#| label: tbl-modelo-categorico
+#| tbl-cap: "Estimativas do modelo final com variável categórica de localização da prateleira."
+
+modelo_categorico = smf.ols(
+    "Vendas ~ PreçoConcorrente + Renda + Publicidade + Preço + Idade + C(LocPrateleira)",
+    data=dados
+).fit()
+
+modelo_categorico.summary2().tables[1].round(4)
 ```
 
-Ao incluir a espécie, os coeficientes de `Species[T.versicolor]` e `Species[T.virginica]` são
-negativos, sugerindo (contraintuitivamente) sépalas mais curtas nessas espécies quando comparadas a
-igual `Petal.Length` e `Sepal.Width`. A causa, novamente, é a multicolinearidade: `Petal.Length`
-está fortemente associada à espécie, de modo que as duas variáveis competem para explicar a mesma
-variabilidade, distorcendo os coeficientes.
+A inclusão da variável categórica `LocPrateleira` permite avaliar se a qualidade da localização dos
+produtos na prateleira apresenta efeito adicional sobre as vendas, após controlar pelas demais
+variáveis explicativas.
 
-### Modelo sem Petal.Length, com a espécie
+Os coeficientes associados às categorias de `LocPrateleira` representam a diferença esperada nas
+vendas em relação à categoria de referência escolhida pelo modelo. Valores positivos indicam
+aumento esperado nas vendas quando comparados à categoria base, enquanto valores negativos indicam
+redução.
+
+### Modelo sem PreçoConcorrente, com LocPrateleira
 
 ```{python}
-#| label: tbl-semPetalLength
-#| tbl-cap: "Estimativas do modelo com Sepal.Width e Species (sem Petal.Length)."
-modelo5 = smf.ols("Q('Sepal.Length') ~ Q('Sepal.Width') + Species", data=dados).fit()
-modelo5.summary2().tables[1].round(4)
+#| label: tbl-semPrecoConcorrente
+#| tbl-cap: "Estimativas do modelo com variáveis quantitativas reduzidas e qualidade da prateleira."
+
+modelo_sem_preco_concorrente = smf.ols(
+    "Vendas ~ Renda + Publicidade + Preço + Idade + C(LocPrateleira)",
+    data=dados
+).fit()
+
+modelo_sem_preco_concorrente.summary2().tables[1].round(4)
 ```
 
-Agora os coeficientes de espécie são positivos e coerentes com a análise exploratória: mantendo
-`Sepal.Width` fixo, uma flor *virginica* tem, em média, sépala mais comprida que uma *setosa*, e uma
-*versicolor* também, em menor magnitude. Este modelo tem, no entanto, $R^2$ ajustado inferior ao do
-modelo2, evidenciando o compromisso entre poder explicativo e interpretabilidade quando há
-multicolinearidade entre uma variável contínua e uma categórica.
+A inclusão da variável categórica `LocPrateleira` permite avaliar se a qualidade da localização dos
+produtos apresenta efeito sobre as vendas após controlar pelas demais variáveis explicativas.
+
+Os coeficientes associados às categorias de `LocPrateleira` representam a diferença média esperada
+nas vendas em relação à categoria de referência utilizada pelo modelo. Valores positivos indicam
+maiores vendas quando comparados à categoria base, enquanto valores negativos indicam redução.
+
+Embora a remoção de `PreçoConcorrente` simplifique o modelo, a comparação dos critérios de ajuste
+permite verificar se essa variável ainda contribui significativamente para explicar a variabilidade
+das vendas.
 
 ### Alterando a categoria de referência
 
-Por padrão, a primeira categoria em ordem alfabética (`setosa`) é a referência. Isto pode ser
-alterado com `Treatment(reference=...)`, por exemplo para tornar `virginica` a referência:
+Por padrão, o `statsmodels` utiliza a primeira categoria em ordem alfabética como referência.
+Essa escolha pode ser modificada utilizando `Treatment(reference=...)`.
 
 ```{python}
 #| echo: true
-modelo6 = smf.ols(
-    "Q('Sepal.Length') ~ Q('Sepal.Width') + C(Species, Treatment(reference='virginica'))",
-    data=dados,
+
+modelo_referencia_good = smf.ols(
+    "Vendas ~ PreçoConcorrente + Renda + Publicidade + Preço + Idade + "
+    "C(LocPrateleira, Treatment(reference='Good'))",
+    data=dados
 ).fit()
-modelo6.params
+
+modelo_referencia_good.params.round(4)
 ```
 
-Os valores preditos pelo modelo não se alteram com a troca de categoria de referência, apenas a
-forma de interpretar os coeficientes: eles agora expressam o desvio médio de cada espécie em
-relação a `virginica`.
+A alteração da categoria de referência não modifica os valores preditos pelo modelo nem seu ajuste.
+Apenas muda a interpretação dos coeficientes, que passam a representar diferenças em relação à
+categoria escolhida como base.
 
 ## Comparação geral dos modelos
 
 ```{python}
 #| label: tbl-geral
-#| tbl-cap: "Comparação das medidas de ajuste entre todos os modelos considerados."
+#| tbl-cap: "Comparação das medidas de ajuste entre os modelos considerados."
+
 tabela(pd.DataFrame({
-    "Modelo": ["modelo1 (completo, sem espécie)", "modelo2 (sem Petal.Width)",
-               "modelo3 (sem Petal.Length)", "modelo4 (com espécie e Petal.Length)",
-               "modelo5 (com espécie, sem Petal.Length)"],
-    "n": [int(m.nobs) for m in (modelo1, modelo2, modelo3, modelo4, modelo5)],
-    "R² ajustado": [round(m.rsquared_adj, 3) for m in (modelo1, modelo2, modelo3, modelo4, modelo5)],
-    "AIC": [round(m.aic, 2) for m in (modelo1, modelo2, modelo3, modelo4, modelo5)],
+    "Modelo": [
+        "Modelo completo",
+        "Modelo reduzido",
+        "Modelo sem PreçoConcorrente",
+        "Modelo final"
+    ],
+    "n": [
+        int(m.nobs)
+        for m in (
+            modelo_completo,
+            modelo_reduzido,
+            modelo_sem_preco_concorrente,
+            modelo_final
+        )
+    ],
+    "R² ajustado": [
+        round(m.rsquared_adj, 3)
+        for m in (
+            modelo_completo,
+            modelo_reduzido,
+            modelo_sem_preco_concorrente,
+            modelo_final
+        )
+    ],
+    "AIC": [
+        round(m.aic, 2)
+        for m in (
+            modelo_completo,
+            modelo_reduzido,
+            modelo_sem_preco_concorrente,
+            modelo_final
+        )
+    ],
 }))
 ```
 
-O modelo2 permanece o melhor modelo em termos de AIC e simplicidade de interpretação, sendo,
-portanto, o modelo utilizado na etapa de previsões a seguir.
+O modelo final foi escolhido considerando o equilíbrio entre capacidade explicativa, simplicidade e
+interpretação dos coeficientes. Embora modelos mais complexos possam apresentar maior ajuste, a
+redução do número de variáveis contribui para um modelo mais parcimonioso, mantendo desempenho
+estatístico adequado.
 
 # Previsões
 
-Utilizando o modelo2, apresentamos as previsões para dois conjuntos hipotéticos: $\mathbf{x}_1$, com
-largura de sépala de 2,8 cm e comprimento de pétala de 1,5 cm; e $\mathbf{x}_2$, com largura de
-sépala de 3,2 cm e comprimento de pétala de 5,0 cm.
+Utilizando o modelo final selecionado (`modelo_final`), foram realizadas previsões para dois cenários
+hipotéticos de uma loja. Os cenários consideram diferentes valores para as variáveis explicativas
+presentes no modelo: preço do concorrente, renda, publicidade, preço praticado pela empresa, idade
+média da população e qualidade da localização na prateleira.
 
 ## Intervalo de confiança para o valor médio esperado
 
 ```{python}
 #| label: tbl-ic
-#| tbl-cap: "Intervalos de confiança de 95% para o comprimento médio esperado da sépala, para os dois conjuntos hipotéticos."
-novos = pd.DataFrame({"Sepal.Width": [2.8, 3.2], "Petal.Length": [1.5, 5.0]})
-pred = modelo2.get_prediction(novos).summary_frame(alpha=0.05)
+#| tbl-cap: "Intervalos de confiança de 95% para a venda média esperada."
+
+novos = pd.DataFrame({
+    "PreçoConcorrente": [120, 130],
+    "Renda": [70, 90],
+    "Publicidade": [10, 15],
+    "Preço": [110, 100],
+    "Idade": [40, 35],
+    "LocPrateleira": ["Medium", "Good"]
+})
+
+pred = modelo_final.get_prediction(novos).summary_frame(alpha=0.05)
+
 tabela(pd.DataFrame({
-    "Larg. Sépala (cm)": [2.8, 3.2],
-    "Comp. Pétala (cm)": [1.5, 5.0],
-    "Estimativa (cm)": pred["mean"].round(2),
+    "Cenário": ["Loja 1", "Loja 2"],
+    "Estimativa de vendas": pred["mean"].round(2),
     "Limite inferior": pred["mean_ci_lower"].round(2),
     "Limite superior": pred["mean_ci_upper"].round(2),
 }))
 ```
 
-**Interpretação prática**: para flores com largura de sépala de 2,8 cm e comprimento de pétala de
-1,5 cm, estimamos que o comprimento **médio** da sépala, entre todas as flores com estas
-características, esteja no intervalo acima, com 95% de confiança. O mesmo raciocínio se aplica ao
-segundo conjunto hipotético.
+A interpretação desses intervalos está relacionada ao valor médio esperado das vendas para lojas
+com características semelhantes aos cenários definidos. Assim, com 95% de confiança, a média das
+vendas para lojas com essas características está contida no intervalo apresentado.
 
-## Intervalo de predição para uma nova observação
+
+##Intervalo de predição para uma nova observação
 
 ```{python}
 #| label: tbl-ip
-#| tbl-cap: "Intervalos de predição de 95% para uma nova observação do comprimento da sépala, para os dois conjuntos hipotéticos."
+#| tbl-cap: "Intervalos de predição de 95% para uma nova observação de vendas."
+
 tabela(pd.DataFrame({
-    "Larg. Sépala (cm)": [2.8, 3.2],
-    "Comp. Pétala (cm)": [1.5, 5.0],
-    "Estimativa (cm)": pred["mean"].round(2),
+    "Cenário": ["Loja 1", "Loja 2"],
+    "Estimativa de vendas": pred["mean"].round(2),
     "Limite inferior": pred["obs_ci_lower"].round(2),
     "Limite superior": pred["obs_ci_upper"].round(2),
 }))
 ```
 
-**Interpretação prática**: se observarmos **uma única nova flor** com largura de sépala de 2,8 cm e
-comprimento de pétala de 1,5 cm, prevemos, com 95% de confiança, que o comprimento de sua sépala
-estará no intervalo acima, bem mais largo que o intervalo de confiança para a média, pois soma à
-incerteza sobre a média a variabilidade natural entre flores individuais.
+O intervalo de predição representa a faixa esperada para uma única nova loja com as características
+informadas. Esse intervalo é naturalmente mais amplo que o intervalo de confiança para a média,
+pois incorpora tanto a incerteza na estimação dos coeficientes quanto a variabilidade natural das
+vendas entre diferentes lojas.
 
 # Conclusão
 
-A execução do modelo linear múltiplo sobre os dados Carseats confirmou que a precificação (interna e da concorrência), o orçamento em publicidade, as características demográficas (Idade e Renda) e, de forma categórica, o posicionamento do produto na prateleira ditam o volume de vendas estatisticamente esperado em cada loja.
+A execução do modelo linear múltiplo sobre os dados Carseats confirmou que a precificação (interna e da concorrência), o orçamento em publicidade, as características 
+demográficas (Idade e Renda) e, de forma categórica, o posicionamento do produto na prateleira ditam o volume de vendas estatisticamente esperado em cada loja.
 
-A redução das variáveis originais fundamentada no AIC e BIC eliminou o ruído de variáveis sem significância para o problema local e blindou o modelo contra efeitos colineares. O desenvolvimento e plotagem das matrizes estudentizadas e das alavancagens corroboram formalmente todos os pressupostos de Gauss-Markov exigidos para o modelo de Ordinary Least Squares (OLS), chancelando a validade dos intervalos preditivos construídos na etapa final.
+A redução das variáveis originais fundamentada no AIC e BIC eliminou o ruído de variáveis sem significância para o problema local e blindou o modelo contra efeitos 
+colineares. O desenvolvimento e plotagem das matrizes estudentizadas e das alavancagens corroboram formalmente todos os pressupostos de Gauss-Markov exigidos para o 
+modelo de Ordinary Least Squares (OLS), chancelando a validade dos intervalos preditivos construídos na etapa final.
 
 # Referências
