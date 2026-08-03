@@ -81,7 +81,7 @@ def dados_convertidos_int():
     dados_int["LocPrateleira"] = (
         dados_int["LocPrateleira"]
         .cat.reorder_categories(
-            ["Bad", "Medium", "Good"],
+            ["Ruim", "Medio", "Bom"],
             ordered=True
         )
         .cat.codes + 1
@@ -91,7 +91,7 @@ def dados_convertidos_int():
         dados_int[coluna] = (
             dados_int[coluna]
             .cat.reorder_categories(
-                ["No", "Yes"],
+                ["Nao", "Sim"],
                 ordered=True
             )
             .cat.codes
@@ -175,7 +175,7 @@ são aferidos via Resíduos Estudentizados e Distância de Cook [@Cook1977].
 
 ## Variáveis dummy e categoria de referência
 
-A variável categórica `LocPrateleira` (Qualidade da localização na prateleira: Ruim, Bom, Médio) é processada via codificação dummy pelo statsmodels. Discutimos o impacto da 
+A variável categórica `LocPrateleira` (Qualidade da localização na prateleira: Ruim, Médio, Bom) é processada via codificação dummy pelo statsmodels. Discutimos o impacto da 
 definição da categoria base na interpretação direta dos coeficientes lineares e no intercepto do modelo.
 
 ## Inferência preditiva
@@ -222,44 +222,12 @@ tabela(pd.DataFrame({
 }))
 ```
 
-A base de dados é composta por 400 observações e 12 variáveis, sendo formada por variáveis quantitativas e categóricas. Entre as variáveis qualitativas, 
-a variável LocPrateleira apresenta três categorias: Ruim, Médio e Bom; enquanto Urbano e EUA possuem duas categorias cada, representadas por Yes e No.
- Não foram identificados valores ausentes na base, garantindo que todas as observações estejam disponíveis para as etapas de análise exploratória e modelagem estatística.
+A base de dados é composta por **400 observações** e **12 variáveis**, sendo formada por variáveis quantitativas e categóricas como observado na @tbl-descricao . Entre as variáveis 
+qualitativas, a variável **LocPrateleira** apresenta **três categorias** (*Ruim*, *Médio* e *Bom*), enquanto **Urbano** e **EUA** possuem **duas categorias** 
+cada, representadas por *Sim* e *Não*. Não foram identificados **valores ausentes** na base de dados, garantindo que todas as observações estejam disponíveis 
+para as etapas de análise exploratória e modelagem estatística.
 
 ## Estatísticas descritivas
-
-```{python}
-#| label: tbl-descritivas
-#| tbl-cap: "Estatísticas descritivas das variáveis numéricas."
-
-descritivas = (
-    dados.drop(columns="id")
-         .select_dtypes(include="number")
-         .describe()
-         .T
-         .reset_index(names="Variável")
-)
-
-descritivas = descritivas.rename(columns={
-    "count": "n",
-    "mean": "Média",
-    "std": "Desvio-padrão",
-    "min": "Mínimo",
-    "25%": "1º Quartil",
-    "50%": "Mediana",
-    "75%": "3º Quartil",
-    "max": "Máximo"
-})
-
-tabela(descritivas)
-```
-
-A Tabela 3 apresenta as estatísticas descritivas das variáveis numéricas da base de dados. 
-Observa-se que as variáveis apresentam escalas distintas, refletindo diferentes características 
-das lojas analisadas. A variável resposta Vendas possui média de aproximadamente 7,5 unidades, 
-com valores variando entre 0 e 18, indicando uma dispersão considerável entre os desempenhos de venda das lojas.
-
-## Análise exploratória
 
 ```{python}
 #| label: tbl-resumo-descritivas
@@ -280,24 +248,40 @@ descritivas = (
 )
 
 tabela(descritivas)
+```
 
+A Tabela -@tbl-resumo-descritivas apresenta as estatísticas descritivas das variáveis numéricas utilizadas na análise. Observa-se que a variável resposta 
+**Vendas** apresentou média de **7,50** e desvio-padrão de **2,82**, indicando variabilidade moderada entre as lojas avaliadas. Entre as variáveis explicativas, 
+**PreçoConcorrente** e **Preço** apresentaram médias de **124,98** e **115,80**, respectivamente, enquanto **Renda** apresentou média de **68,66**. As variáveis 
+**Publicidade**, **População**, **Idade** e **Educação** também apresentaram amplitudes consideráveis, evidenciando heterogeneidade entre as observações.
+
+De modo geral, as diferenças entre os valores **mínimos**, **quartis** e **máximos** indicam variabilidade suficiente nas variáveis, característica desejável 
+para o ajuste de modelos de regressão linear, pois favorece a identificação das relações entre a variável resposta e os preditores. Além disso, a ausência de 
+valores ausentes permitiu a utilização das **400 observações** em todas as etapas da análise, sem necessidade de procedimentos de imputação ou exclusão de registros.
+
+## Análise exploratória
+
+```{python}
 #| label: fig-boxplot-prateleira
 #| fig-cap: "Distribuição das vendas segundo a qualidade da localização na prateleira."
 
 fig, ax = plt.subplots(figsize=(6,4))
 
 cores = {
-    "Bad": "#cb3028",
-    "Medium": "#f7cd5c",
-    "Good": "#1d874b"
+    "Ruim": "#cb3028",
+    "Medio": "#f7cd5c",
+    "Bom": "#1d874b"
 }
 
 sns.boxplot(
     data=dados,
     x="LocPrateleira",
     y="Vendas",
-    order=["Bad", "Medium", "Good"],
+    hue="LocPrateleira",
+    order=["Ruim", "Medio", "Bom"],
     palette=cores,
+    dodge=False,
+    legend=False,
     ax=ax
 )
 
@@ -305,7 +289,7 @@ sns.stripplot(
     data=dados,
     x="LocPrateleira",
     y="Vendas",
-    order=["Bad", "Medium", "Good"],
+    order=["Ruim", "Medio", "Bom"],
     color="black",
     alpha=0.4,
     jitter=0.2,
@@ -317,71 +301,55 @@ ax.set_ylabel("Vendas (milhares de unidades)")
 
 plt.show()
 ```
-A Figura -@fig-boxplot-prateleira apresenta a distribuição das vendas em função da qualidade da localização na prateleira. Observa-se que lojas classificadas como **Good** 
-tendem a apresentar maiores níveis de vendas e maior variabilidade. As lojas com classificação **Medium** apresentam valores intermediários, enquanto aquelas classificadas 
-como **Bad** concentram as menores vendas, sugerindo uma associação positiva entre a qualidade da exposição do produto e o desempenho das vendas.
+A Figura -@fig-boxplot-prateleira apresenta a distribuição das vendas em função da qualidade da localização na prateleira. Observa-se que lojas classificadas como **Bom** 
+tendem a apresentar maiores níveis de vendas e maior variabilidade. As lojas com classificação **Médio** apresentam valores intermediários, enquanto aquelas classificadas 
+como **Ruim** concentram as menores vendas, sugerindo uma associação positiva entre a qualidade da exposição do produto e o desempenho das vendas.
 
 
 ### Análise de correlação
 
 ```{python}
 #| label: tbl-correlacao
-#| tbl-cap: "Matriz de correlação de Pearson entre as variáveis numéricas."
+#| tbl-cap: "Matriz de correlação de Pearson entre as variáveis numéricas e as variáveis ordinais codificadas."
 
-numericas = (
-    dados
-    .select_dtypes(include="number")
+dados_corr = dados_convertidos_int()
+
+matriz_cor = (
+    dados_corr
     .drop(columns="id")
+    .corr(method="pearson")
 )
 
-matriz_cor = numericas.corr()
+nomes = {
+    "PreçoConcorrente": "Preço Conc.",
+    "Publicidade": "Public.",
+    "População": "Pop.",
+    "Educação": "Educ.",
+    "LocPrateleira": "Loc. Prat."
+}
+
+matriz_cor = matriz_cor.rename(index=nomes, columns=nomes)
 
 tabela(matriz_cor.reset_index(names="Variável"))
 ```
 
-```{python}
-#| label: fig-correlacao-spearman
-#| fig-cap: "Matriz de correlação de Spearman entre as variáveis numéricas e as variáveis categóricas codificadas."
+A Tabela -@tbl-correlacao apresenta a matriz de correlação de Pearson entre as variáveis numéricas e as variáveis ordinais codificadas. Observa-se que a variável resposta 
+**Vendas** apresenta correlação **negativa moderada** com **Preço** (**$r=-0,44$**), indicando que preços mais elevados tendem a estar associados a menores volumes de vendas. 
+Em contrapartida, verificam-se correlações **positivas** com **Publicidade** (**$r=0,27$**) e, principalmente, com a qualidade da **LocPrateleira** (**$r=0,58$**), sugerindo 
+que maiores investimentos em publicidade e melhores posições na prateleira estão associados ao aumento das vendas.
 
-dados_corr = dados_convertidos_int()
+Entre as variáveis explicativas, destaca-se a correlação positiva entre **Preço** e **PreçoConcorrente** (**$r=0,58$**), indicando que os preços praticados pela empresa e 
+pelos concorrentes tendem a variar conjuntamente. Também se observa uma associação relativamente elevada entre **LocPrateleira** e **Preço** (**$r=0,55$**), enquanto as 
+demais correlações apresentam **baixa magnitude** (em geral, **$|r|<0,30$**), evidenciando fraca associação linear entre os preditores.
 
-matriz_spearman = (
-    dados_corr
-    .select_dtypes(include="number")
-    .drop(columns="id")
-    .corr(method="spearman")
-)
-
-fig, ax = plt.subplots(figsize=(8, 6))
-
-sns.heatmap(
-    matriz_spearman,
-    annot=True,
-    fmt=".2f",
-    cmap="coolwarm",
-    center=0,
-    vmin=-1,
-    vmax=1,
-    linewidths=0.5,
-    square=True,
-    cbar_kws={"label": "Correlação"},
-    ax=ax
-)
-
-ax.set_title("Matriz de Correlação de Spearman")
-
-plt.show()
-```
-
-A Figura -@fig-correlacao apresenta a matriz de correlação de Pearson entre as variáveis numéricas da base de dados. Observa-se que algumas variáveis apresentam associação 
-linear moderada, enquanto outras possuem correlação próxima de zero. Em especial, espera-se que as Vendas estejam negativamente correlacionadas com o Preço e positivamente 
-correlacionadas com a Publicidade e a Renda, embora a intensidade dessas relações deva ser confirmada pelos coeficientes estimados no modelo de regressão. Além disso, 
-correlações elevadas entre variáveis explicativas podem indicar a presença de multicolinearidade, aspecto posteriormente avaliado pelo fator de inflação da variância (VIF).
+De modo geral, a matriz de correlação não evidencia correlações muito elevadas (por exemplo, **$|r|>0,80$**) entre as variáveis explicativas, sugerindo ausência de indícios 
+fortes de multicolinearidade. Essa conclusão é posteriormente corroborada pela análise do **Fator de Inflação da Variância (VIF)**, que confirma a estabilidade dos 
+coeficientes estimados no modelo de regressão.
 
 ## Multicolinearidade: o VIF
 
 ```{python}
-#| label: tbl-modeloCompleto
+#| label: tbl-modelo_completo
 #| tbl-cap: "Estimativas do modelo inicial completo."
 
 modelo_completo = smf.ols(
@@ -417,12 +385,19 @@ vif_resultado = (
 tabela(vif_resultado.reset_index(names="Variável"))
 ```
 
-O diagnóstico de multicolinearidade foi realizado utilizando o fator de inflação da variância (VIF). Valores elevados de VIF indicam que uma variável explicativa apresenta 
-forte relação linear com as demais variáveis do modelo, aumentando a variância dos estimadores.
+O modelo inicial completo foi ajustado considerando todas as variáveis explicativas quantitativas e categóricas disponíveis. Conforme apresentado na 
+@tbl-modelo_completo, os coeficientes associados às variáveis **PreçoConcorrente**, **Renda**, **Publicidade**, **Preço** e **Idade** foram **estatisticamente 
+significativos** ao nível de **5%** (**$p<0{,}05$**), indicando que essas variáveis exercem influência sobre as **Vendas**. Em particular, **Publicidade** e 
+**PreçoConcorrente** apresentaram **efeitos positivos**, sugerindo aumento das vendas à medida que essas variáveis aumentam, enquanto **Preço** e **Idade** 
+apresentaram **efeitos negativos**, indicando redução esperada nas vendas. Entre as variáveis categóricas, os níveis de **LocPrateleira** também se mostraram
+ estatisticamente significativos, evidenciando que a localização do produto na prateleira influencia o volume de vendas. Em contrapartida, as variáveis **Urbano**, 
+ **EUA**, **População** e **Educação** não apresentaram evidências de contribuição individual ao modelo (**$p>0{,}05$**), uma vez que seus coeficientes não foram estatisticamente significativos.
 
-A Tabela -@tbl-vif apresenta os valores de VIF para as variáveis quantitativas do modelo inicial. Observa-se que todas as variáveis apresentam valores inferiores ao limite 
-de referência de 10, indicando ausência de problemas severos de multicolinearidade. Dessa forma, as estimativas dos coeficientes permanecem estáveis quanto à presença de correlação entre os preditores.
-
+O diagnóstico de multicolinearidade foi realizado por meio do **Fator de Inflação da Variância (VIF)**, cujos resultados são apresentados na Tabela -@tbl-vif. 
+Os valores obtidos variaram entre **1,01** e **1,55**, permanecendo muito abaixo dos limites de referência de **5** e **10** normalmente adotados na literatura. 
+Esses resultados indicam **ausência de multicolinearidade relevante** entre as variáveis quantitativas, sugerindo que os coeficientes estimados são estáveis e 
+que a variância dos estimadores não foi inflacionada por relações lineares excessivas entre os preditores. Dessa forma, a seleção do modelo final pôde ser 
+conduzida com base principalmente em critérios de **parcimônia** e **qualidade de ajuste**, representados pelos critérios de informação **AIC** e **BIC**, e não por problemas de multicolinearidade.
 
 ## Seleção do modelo final
 
@@ -466,14 +441,16 @@ comparacao = pd.DataFrame({
 tabela(comparacao)
 ```
 
-A comparação entre os modelos foi realizada utilizando o coeficiente de determinação ajustado
-($R^2$ ajustado), além dos critérios de informação de Akaike (AIC) e Bayesiano (BIC). Valores
-menores de AIC e BIC indicam modelos mais parcimoniosos, equilibrando qualidade de ajuste e
-complexidade.
+A Tabela -@tbl-selecao apresenta a comparação entre o **modelo completo** e o **modelo reduzido** utilizando o coeficiente de determinação ajustado 
+(**$R^2$ ajustado**) e os critérios de informação **Akaike (AIC)** e **Bayesiano (BIC)**. Enquanto o **$R^2$ ajustado** mede a proporção da variabilidade 
+da variável resposta explicada pelo modelo, o **AIC** é um critério de seleção que busca equilibrar **qualidade de ajuste** e **complexidade**, 
+penalizando modelos com maior número de parâmetros. Assim, entre modelos ajustados aos mesmos dados, **o modelo com menor valor de AIC é considerado o 
+mais adequado**, pois tende a apresentar melhor capacidade de generalização sem incorporar variáveis desnecessárias.
 
-O modelo reduzido apresenta ajuste comparável ao modelo completo, com menor complexidade 
-estrutural. A redução do número de variáveis explicativas resulta em um modelo mais parcimonioso, 
-mantendo capacidade explicativa semelhante segundo os critérios avaliados.
+Conforme observado na Tabela -@tbl-selecao, ambos os modelos apresentam praticamente o mesmo poder explicativo (**$R^2$ ajustado = 0,87**). Entretanto, 
+o **modelo reduzido** apresentou **AIC = 1158,47**, inferior ao do **modelo completo** (**AIC = 1161,97**), indicando que a remoção das variáveis 
+**População**, **Educação**, **Urbano** e **EUA** produziu um modelo mais parcimonioso sem perda relevante de qualidade de ajuste. O **BIC** também 
+favorece o modelo reduzido (**1190,40** contra **1209,87**), reforçando essa conclusão.
 
 ```{python}
 #| label: tbl-anova-modelos
@@ -500,19 +477,28 @@ tabela(
 )
 ```
 
-O teste F foi utilizado para verificar se a remoção das variáveis presentes no modelo 
-completo provoca perda significativa de capacidade explicativa. Caso o teste não 
-rejeite a hipótese nula, o modelo reduzido é considerado equivalente ao modelo 
-completo, sendo preferível devido à sua maior parcimônia.
+Para verificar se a simplificação do modelo implicou perda significativa de capacidade explicativa, foi realizado o **teste F para modelos aninhados**, apresentado na Tabela -@tbl-anova-modelos. O teste resultou em **estatística F = 1,10** e **p-valor = 0,36**, não havendo evidências estatísticas para rejeitar a hipótese nula de que o modelo reduzido apresenta desempenho equivalente ao modelo completo. Isso indica que as variáveis removidas não contribuem significativamente para explicar a variabilidade das **Vendas**.
 
+Dessa forma, a escolha do **modelo reduzido** foi fundamentada principalmente no **critério de Akaike (AIC)**, que indicou ser possível obter praticamente o mesmo nível de ajuste utilizando um número menor de parâmetros. Essa decisão resulta em um modelo **mais parcimonioso**, de interpretação mais simples e com potencial de melhor capacidade de generalização, sem prejuízo estatisticamente significativo em relação ao modelo completo.
+
+```{python}
 #| label: tbl-modelo-final
 #| tbl-cap: "Estimativas dos coeficientes do modelo final selecionado."
 
-```{python}
 modelo_final = modelo_reduzido
 
 modelo_final.summary2().tables[1].round(4)
 ```
+
+A Tabela -@tbl-modelo-final apresenta as estimativas dos coeficientes do modelo final selecionado. Todos os preditores remanescentes apresentaram **significância estatística** ao nível de **5%** (**$p<0{,}05$**), indicando contribuição individual para a explicação da variável **Vendas**.
+
+Mantidas as demais variáveis constantes, observa-se que um aumento de **uma unidade** em **PreçoConcorrente** está associado a um incremento médio de aproximadamente **0,093 unidades** nas vendas. De forma semelhante, **Renda** e **Publicidade** apresentam efeitos positivos, com coeficientes estimados de **0,016** e **0,116**, respectivamente, indicando que maiores níveis de renda da população e maiores investimentos em publicidade tendem a aumentar o volume esperado de vendas.
+
+Por outro lado, as variáveis **Preço** e **Idade** apresentaram coeficientes negativos (**-0,095** e **-0,046**, respectivamente). Isso indica que, mantendo as demais variáveis constantes, aumentos no preço do produto ou na idade média da população estão associados à redução das vendas esperadas.
+
+Para a variável categórica **LocPrateleira**, tomando a categoria **Bom** como referência, observa-se que produtos posicionados em prateleiras de qualidade **Médio** apresentam, em média, **2,88 unidades** a menos de vendas, enquanto produtos em prateleiras **Ruim** apresentam redução média de aproximadamente **4,84 unidades**. Esses resultados evidenciam a forte influência da localização do produto na prateleira sobre o desempenho de vendas.
+
+Em conjunto, os coeficientes estimados apresentam sinais coerentes com a interpretação prática do problema e reforçam que fatores relacionados ao **preço**, **publicidade**, **renda dos consumidores** e, principalmente, à **qualidade da localização na prateleira** desempenham papel relevante na explicação das vendas.
 
 ### Seleção automática (eliminação retroativa por AIC)
 
@@ -1017,13 +1003,13 @@ Essa escolha pode ser modificada utilizando `Treatment(reference=...)`.
 ```{python}
 #| echo: true
 
-modelo_referencia_good = smf.ols(
+modelo_referencia_bom = smf.ols(
     "Vendas ~ PreçoConcorrente + Renda + Publicidade + Preço + Idade + "
-    "C(LocPrateleira, Treatment(reference='Good'))",
+    "C(LocPrateleira, Treatment(reference='Bom'))",
     data=dados
 ).fit()
 
-modelo_referencia_good.params.round(4)
+modelo_referencia_bom.params.round(4)
 ```
 
 A alteração da categoria de referência não modifica os valores preditos pelo modelo nem seu ajuste.
@@ -1097,7 +1083,7 @@ novos = pd.DataFrame({
     "Publicidade": [10, 15],
     "Preço": [110, 100],
     "Idade": [40, 35],
-    "LocPrateleira": ["Medium", "Good"]
+    "LocPrateleira": ["Medio", "Bom"]
 })
 
 pred = modelo_final.get_prediction(novos).summary_frame(alpha=0.05)
