@@ -56,7 +56,10 @@ def tabela(df, digitos=2):
     return Markdown(df.round(digitos).fillna("").to_markdown(index=False))
 
 def extract():
-    dados = pd.read_csv("dados/04_Carseats.csv")
+    dadosFull = pd.read_csv("dados/04_Carseats.csv")
+
+    dados = dadosFull.sample(frac=0.80, random_state=1)
+    dadosTeste = dadosFull.drop(dados.index)
 
     dados.columns = dados.columns.str.strip()
 
@@ -73,10 +76,10 @@ def extract():
             .astype("category")
         )
 
-    return dados
+    return dados, dadosTeste
 
 def dados_convertidos_int():
-    dados_int = extract()
+    dados_int, _ = extract()
 
     dados_int["LocPrateleira"] = (
         dados_int["LocPrateleira"]
@@ -100,7 +103,7 @@ def dados_convertidos_int():
     return dados_int
 
 # DataFrame principal
-dados = extract()
+dados, dadosTeste = extract()
 
 
 def vif_manual(exog_df):
@@ -1077,16 +1080,7 @@ média da população e qualidade da localização na prateleira.
 #| label: tbl-ic
 #| tbl-cap: "Intervalos de confiança de 95% para a venda média esperada."
 
-novos = pd.DataFrame({
-    "PreçoConcorrente": [120, 130],
-    "Renda": [70, 90],
-    "Publicidade": [10, 15],
-    "Preço": [110, 100],
-    "Idade": [40, 35],
-    "LocPrateleira": ["Medio", "Bom"]
-})
-
-pred = modelo_final.get_prediction(novos).summary_frame(alpha=0.05)
+pred = modelo_final.get_prediction(dadosTeste).summary_frame(alpha=0.05)
 
 tabela(pd.DataFrame({
     "Cenário": ["Loja 1", "Loja 2"],
@@ -1096,9 +1090,7 @@ tabela(pd.DataFrame({
 }))
 ```
 
-A interpretação desses intervalos está relacionada ao valor médio esperado das vendas para lojas
-com características semelhantes aos cenários definidos. Assim, com 95% de confiança, a média das
-vendas para lojas com essas características está contida no intervalo apresentado.
+O intervalo de confiança está relacionado ao valor médio esperado para as vendas. Com base nas variáveis escolhidas para fazer parte do modelo, que são as mais influentes na variável de interesse (vendas). Assim, com 95% de confiança, a média das vendas para o conjunto de teste se encontra no intervalo predito.
 
 
 ##Intervalo de predição para uma nova observação
@@ -1115,10 +1107,10 @@ tabela(pd.DataFrame({
 }))
 ```
 
-O intervalo de predição representa a faixa esperada para uma única nova loja com as características
+O intervalo de predição representa a faixa esperada para uma única observação com as características
 informadas. Esse intervalo é naturalmente mais amplo que o intervalo de confiança para a média,
 pois incorpora tanto a incerteza na estimação dos coeficientes quanto a variabilidade natural das
-vendas entre diferentes lojas.
+vendas entre diferentes circunstâncias.
 
 # Conclusão
 
