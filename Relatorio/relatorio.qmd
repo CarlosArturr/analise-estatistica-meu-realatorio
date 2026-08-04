@@ -258,7 +258,7 @@ A Tabela -@tbl-resumo-descritivas apresenta as estatísticas descritivas das var
 **PreçoConcorrente** e **Preço** apresentaram médias de **124,98** e **115,80**, respectivamente, enquanto **Renda** apresentou média de **68,66**. As variáveis 
 **Publicidade**, **População**, **Idade** e **Educação** também apresentaram amplitudes consideráveis, evidenciando heterogeneidade entre as observações.
 
-De modo geral, as diferenças entre os valores **mínimos**, **quartis** e **máximos** indicam variabilidade suficiente nas variáveis, característica desejável 
+De modo geral, as diferenças entre os valores **mínimos** e **máximos** indicam variabilidade suficiente nas variáveis, característica desejável 
 para o ajuste de modelos de regressão linear, pois favorece a identificação das relações entre a variável resposta e os preditores. Além disso, a ausência de 
 valores ausentes permitiu a utilização das **400 observações** em todas as etapas da análise, sem necessidade de procedimentos de imputação ou exclusão de registros.
 
@@ -1069,17 +1069,6 @@ variáveis categóricas em variáveis dummy. Nesse processo, uma das categorias 
 e os coeficientes estimados representam diferenças em relação a essa categoria base.
 
 ```{python}
-#| echo: true
-
-dados["LocPrateleira"].unique()
-
-pd.get_dummies(
-    dados["LocPrateleira"],
-    drop_first=True
-).head()
-```
-
-```{python}
 #| label: tbl-modelo-categorico
 #| tbl-cap: "Estimativas do modelo final com variável categórica de localização da prateleira."
 
@@ -1280,11 +1269,42 @@ das vendas entre diferentes lojas e condições de mercado.
 
 # Conclusão
 
-A execução do modelo linear múltiplo sobre os dados Carseats confirmou que a precificação (interna e da concorrência), o orçamento em publicidade, as características 
-demográficas (Idade e Renda) e, de forma categórica, o posicionamento do produto na prateleira ditam o volume de vendas estatisticamente esperado em cada loja.
+Este trabalho apresentou a construção, seleção, validação e interpretação de um modelo de regressão
+linear múltipla para explicar o comportamento das vendas da base de dados **Carseats**. Inicialmente,
+foi realizada uma análise exploratória dos dados, seguida pelo ajuste de um modelo completo contendo
+todas as variáveis explicativas disponíveis. Posteriormente, foram conduzidas análises de
+multicolinearidade, seleção de variáveis e diagnóstico dos pressupostos do modelo, permitindo a
+obtenção de um modelo final mais parcimonioso e de fácil interpretação.
 
-A redução das variáveis originais fundamentada no AIC e BIC eliminou o ruído de variáveis sem significância para o problema local e blindou o modelo contra efeitos 
-colineares. O desenvolvimento e plotagem das matrizes estudentizadas e das alavancagens corroboram formalmente todos os pressupostos de Gauss-Markov exigidos para o 
-modelo de Ordinary Least Squares (OLS), chancelando a validade dos intervalos preditivos construídos na etapa final.
+A seleção das variáveis foi baseada principalmente no **Critério de Informação de Akaike (AIC)**,
+com apoio do **Critério de Informação Bayesiano (BIC)** e do teste F para comparação entre modelos
+aninhados. Esse procedimento indicou que as variáveis **PreçoConcorrente**, **Renda**,
+**Publicidade**, **Preço**, **Idade** e **LocPrateleira** são suficientes para explicar grande parte
+da variabilidade das vendas, enquanto as variáveis **População**, **Educação**, **Urbano** e
+**EUA** não acrescentaram ganho significativo ao ajuste do modelo.
+
+Os diagnósticos realizados mostraram que os pressupostos fundamentais da regressão linear foram
+adequadamente atendidos. A análise dos resíduos não evidenciou violações importantes das hipóteses de
+linearidade, homocedasticidade, independência e normalidade. Além disso, os valores do fator de
+inflação da variância (VIF) permaneceram baixos, indicando ausência de problemas relevantes de
+multicolinearidade. A avaliação das observações influentes também mostrou que, embora alguns pontos
+tenham sido identificados pelos critérios de resíduos studentizados, alavancagem e distância de Cook,
+sua influência sobre os coeficientes estimados foi reduzida, não justificando sua exclusão.
+
+A interpretação dos coeficientes evidenciou que o **Preço** constitui o fator quantitativo de maior
+impacto relativo sobre as vendas, apresentando associação negativa com a variável resposta. Em
+contrapartida, **PreçoConcorrente** e **Publicidade** apresentaram associações positivas, indicando
+que maiores preços praticados pelos concorrentes e maiores investimentos em publicidade tendem a
+favorecer o volume de vendas. Adicionalmente, a variável categórica **LocPrateleira** demonstrou que
+a posição do produto na prateleira exerce influência significativa sobre o desempenho das vendas,
+reforçando a importância da exposição dos produtos no ponto de venda.
+
+Por fim, a capacidade preditiva do modelo foi avaliada utilizando um conjunto de teste correspondente
+a **20% das observações**, enquanto os **80% restantes** foram utilizados para o ajuste do modelo.
+Os resultados obtidos indicaram boa concordância entre os valores observados e estimados, com erro
+médio absoluto reduzido, demonstrando que o modelo apresenta desempenho satisfatório para previsão
+em dados não utilizados durante o treinamento.
+
+Dessa forma, os resultados indicam que empresas do setor podem utilizar modelos de regressão linear múltipla como ferramenta de apoio à tomada de decisão, identificando os fatores que mais influenciam o desempenho comercial e direcionando investimentos para ações com maior potencial de retorno. Dessa forma, o modelo desenvolvido constitui um instrumento útil tanto para compreender o comportamento das vendas quanto para subsidiar estratégias de marketing, precificação e gestão do relacionamento com os pontos de venda.
 
 # Referências
