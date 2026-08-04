@@ -506,12 +506,11 @@ Em conjunto, os coeficientes estimados apresentam sinais coerentes com a interpr
 ### Seleção automática (eliminação retroativa por AIC)
 
 
-O `statsmodels` não possui uma função equivalente ao `step()` do R; reproduzimos a mesma lógica de
-eliminação retroativa manualmente, removendo a cada passo a variável cuja remoção resulta no maior
-ganho de AIC, e parando quando nenhuma remoção melhora o critério:
+O `statsmodels` não possui uma função nativa equivalente ao procedimento `step()` disponível no R. Dessa forma, foi implementada uma estratégia de **eliminação retroativa baseada no critério de informação de Akaike (AIC)**. O procedimento inicia com o modelo contendo todas as variáveis candidatas e, a cada etapa, avalia a remoção individual de cada preditor. A variável cuja exclusão proporciona a maior redução no valor do AIC é removida, repetindo-se o processo até que nenhuma remoção adicional produza melhora no critério.
+
+O critério **AIC (Akaike Information Criterion)** busca selecionar modelos que apresentem um equilíbrio entre **qualidade de ajuste** e **complexidade**, penalizando a inclusão de parâmetros adicionais que não proporcionem ganho suficiente na explicação da variável resposta. Portanto, entre diferentes modelos ajustados aos mesmos dados, valores menores de AIC indicam modelos mais eficientes segundo esse critério.
 
 ```{python}
-#| echo: true
 
 def selecao_retroativa(termos, dados, resposta):
 
@@ -574,6 +573,10 @@ def selecao_retroativa(termos, dados, resposta):
 
     return modelo_atual
 
+print(f"A aplicação do procedimento de eliminação retroativa apresentou os seguintes resultados:\n")
+```
+```{python}
+#| echo: true
 
 modelo_aic = selecao_retroativa(
     [
@@ -590,13 +593,12 @@ modelo_aic = selecao_retroativa(
 )
 ```
 
-O procedimento de eliminação retroativa baseado no critério AIC foi utilizado como uma estratégia
-de seleção automática de variáveis. O método busca encontrar um equilíbrio entre qualidade de
-ajuste e complexidade do modelo, penalizando modelos com excesso de parâmetros.
 
-O modelo selecionado pelo AIC foi comparado com os modelos candidatos avaliados anteriormente. A
-seleção automática serviu como uma análise complementar, enquanto a decisão final considerou
-também a interpretação dos coeficientes e os diagnósticos de adequação do modelo.
+Após essas remoções, nenhuma outra variável apresentou redução adicional no AIC, indicando que o modelo selecionado pelo procedimento automático foi aquele contendo as variáveis **PreçoConcorrente**, **Renda**, **Publicidade**, **Preço** e **Idade**.
+
+O resultado obtido indica que as variáveis **População** e **Educação** não acrescentavam informação suficiente ao modelo para compensar o aumento de complexidade causado pela sua inclusão. Dessa forma, o procedimento automático reforça a busca por um modelo mais parcimonioso, removendo variáveis com menor contribuição segundo o critério de informação adotado.
+
+Entretanto, a seleção automática baseada exclusivamente no AIC foi utilizada como uma análise complementar. A escolha final do modelo também considerou a interpretação dos coeficientes, a significância estatística dos preditores e os diagnósticos de adequação do modelo. Assim, a decisão pelo modelo final foi baseada não apenas no desempenho preditivo, mas também na simplicidade e interpretabilidade da estrutura obtida.
 
 ## Diagnóstico do modelo selecionado
 
@@ -611,14 +613,17 @@ fig, axes = plt.subplots(
 
 modelo_final = modelo_reduzido
 
+influencia = modelo_final.get_influence()
+
+n = int(modelo_final.nobs)
+p = int(modelo_final.df_model + 1)
+
 ajustados = modelo_final.fittedvalues
 residuos = modelo_final.resid
 
-res_pad = (
-    modelo_final
-    .get_influence()
-    .resid_studentized_internal
-)
+res_pad = influencia.resid_studentized_internal
+alavancagem = influencia.hat_matrix_diag
+distancia_cook = influencia.cooks_distance[0]
 
 
 # Resíduos x ajustados
@@ -644,15 +649,66 @@ axes[0,0].set_ylabel(
 )
 
 
-# QQ plot
+# QQ plot com envelope de 95%
 
-sm.qqplot(
-    res_pad,
-    line="45",
-    ax=axes[0,1]
+residuos_ordenados = np.sort(res_pad)
+
+p_valores = (
+    np.arange(1, n + 1) - 0.5
+) / n
+
+quantis_teoricos = stats.norm.ppf(p_valores)
+
+
+axes[0,1].scatter(
+    quantis_teoricos,
+    residuos_ordenados,
+    alpha=0.6
 )
 
-axes[0,1].set_title("")
+
+min_val = min(
+    quantis_teoricos.min(),
+    residuos_ordenados.min()
+)
+
+max_val = max(
+    quantis_teoricos.max(),
+    residuos_ordenados.max()
+)
+
+axes[0,1].plot(
+    [min_val, max_val],
+    [min_val, max_val],
+    color="grey",
+    lw=0.8
+)
+
+
+se_quantis = (
+    1 / stats.norm.pdf(quantis_teoricos)
+) * np.sqrt(
+    (p_valores * (1 - p_valores)) / n
+)
+
+margem = 1.96 * se_quantis
+
+
+axes[0,1].fill_between(
+    quantis_teoricos,
+    quantis_teoricos - margem,
+    quantis_teoricos + margem,
+    alpha=0.2
+)
+
+
+axes[0,1].set_xlabel(
+    "Quantis teóricos"
+)
+
+axes[0,1].set_ylabel(
+    "Resíduos padronizados"
+)
 
 
 # Escala-localização
@@ -672,26 +728,38 @@ axes[1,0].set_ylabel(
 )
 
 
-# Alavancagem
+# Alavancagem e influência
 
-alavancagem = (
-    modelo_final
-    .get_influence()
-    .hat_matrix_diag
+tamanho_bolhas = (
+    20 +
+    (distancia_cook / distancia_cook.max()) * 300
 )
 
 
 axes[1,1].scatter(
     alavancagem,
     res_pad,
+    s=tamanho_bolhas,
     alpha=0.6
 )
+
 
 axes[1,1].axhline(
     0,
     color="grey",
     lw=0.8
 )
+
+
+limite_alavancagem = 2 * p / n
+
+axes[1,1].axvline(
+    limite_alavancagem,
+    color="grey",
+    linestyle="--",
+    lw=0.8
+)
+
 
 axes[1,1].set_xlabel(
     "Alavancagem"
@@ -705,66 +773,37 @@ axes[1,1].set_ylabel(
 plt.tight_layout()
 
 plt.show()
-
-#| label: fig-envelope
-#| fig-cap: "Gráfico de envelope simulado do modelo final."
-
-q, obs, low, up = envelope_normal(modelo_final)
-
-
-fig, ax = plt.subplots(
-    figsize=(4.5,3.5)
-)
-
-
-ax.plot(
-    q,
-    low,
-    color="black",
-    lw=0.8
-)
-
-ax.plot(
-    q,
-    up,
-    color="black",
-    lw=0.8
-)
-
-ax.plot(
-    q,
-    (low+up)/2,
-    "--",
-    color="black",
-    lw=0.8
-)
-
-ax.scatter(
-    q,
-    obs,
-    s=12
-)
-
-
-ax.set_xlabel(
-    "Quantis teóricos N(0,1)"
-)
-
-ax.set_ylabel(
-    "Resíduos"
-)
-
-
-plt.show()
 ```
 
-As análises gráficas dos resíduos indicam que o modelo final apresenta comportamento compatível
-com as principais suposições da regressão linear. Não foram observados padrões sistemáticos no
-gráfico de resíduos versus valores ajustados, sugerindo adequação da relação linear.
+As análises de diagnóstico foram realizadas com o objetivo de verificar se o modelo final atende às principais suposições da regressão linear, avaliando aspectos como linearidade, homogeneidade da variância dos resíduos e normalidade dos erros.
 
-O gráfico de escala-localização não apresenta evidências fortes de heterocedasticidade, enquanto
-o envelope normal mostra que a maior parte dos resíduos permanece dentro da região esperada,
-fornecendo suporte à hipótese de normalidade dos erros.
+A análise do gráfico de **resíduos versus valores ajustados** @fig-diagnostico não indicou a presença de padrões sistemáticos ou estruturas de curvatura, sugerindo que a relação linear entre as variáveis explicativas e a variável resposta é adequada. Além disso, a distribuição dos resíduos apresentou comportamento aproximadamente aleatório em torno de zero.
+
+O gráfico de **escala-localização** @fig-diagnostico não apresentou tendência crescente ou decrescente acentuada, indicando ausência de evidências fortes de heterocedasticidade. Dessa forma, a hipótese de variância aproximadamente constante dos erros é considerada adequada para o modelo ajustado.
+
+A avaliação da normalidade dos resíduos, realizada por meio do envelope normal, mostrou que a maior parte das observações permanece dentro da região esperada. Embora alguns pontos apresentem pequenos desvios nas extremidades, o comportamento geral dos resíduos fornece suporte à suposição de normalidade dos erros.
+
+## 3.6.1 Identificação de pontos atípicos, de alavanca e influentes
+
+A identificação de observações potencialmente problemáticas foi realizada utilizando três medidas complementares: **resíduos studentizados**, **alavancagem** e **distância de Cook**. Os resíduos studentizados permitem identificar observações com valores discrepantes em relação ao comportamento esperado pelo modelo, sendo consideradas potencialmente atípicas aquelas com valor absoluto superior a 2. A medida de alavancagem avalia o quanto uma observação possui valores extremos nas variáveis explicativas, enquanto a distância de Cook mensura o impacto global de cada observação sobre as estimativas dos coeficientes.
+
+Considerando **$n=320$ observações** e **$p=8$ parâmetros estimados**, foram utilizados os limites de referência:
+
+$$
+\text{Alavancagem} > \frac{2p}{n} = \frac{2(8)}{320} \approx 0,05
+$$
+
+e
+
+$$
+\text{Distância de Cook} > \frac{4}{n} = \frac{4}{320} \approx 0,0125
+$$
+
+A Tabela -@tbl-influencia apresenta as observações identificadas por pelo menos um dos critérios avaliados. Foram encontrados alguns pontos com resíduos studentizados superiores ao limite de referência, indicando possíveis observações atípicas. Também foram identificadas observações com alta alavancagem, ou seja, pontos localizados em regiões menos representadas do espaço das variáveis explicativas.
+
+Entretanto, a distância de Cook permaneceu baixa para a maioria das observações, indicando que, apesar de algumas apresentarem características atípicas ou elevada alavancagem, seu impacto individual sobre os coeficientes estimados do modelo não é expressivo. Dessa forma, não foram identificadas observações com influência excessiva que justificassem a remoção dos dados.
+
+Assim, optou-se por manter todas as observações no ajuste final, considerando que os pontos identificados representam parte da variabilidade natural dos dados e não comprometem a adequação geral do modelo.
 
 ### Identificação de pontos atípicos, de alavanca e influentes
 
@@ -837,13 +876,13 @@ influentes = tab_infl.index[
     tab_infl["Influente"]
 ]
 
+dados_modelo = dados.reset_index(drop=True)
 
 modelo_refinado = smf.ols(
     "Vendas ~ PreçoConcorrente + Renda + Publicidade + "
     "Preço + Idade + C(LocPrateleira)",
-    data=dados.drop(index=influentes)
+    data=dados_modelo.drop(index=influentes)
 ).fit()
-
 
 comparacao_coef = pd.DataFrame({
     "Modelo final": modelo_final.params,
@@ -877,13 +916,55 @@ Caso as diferenças entre os coeficientes sejam pequenas, conclui-se que as obse
 não possuem influência excessiva sobre o ajuste do modelo. Dessa forma, elas podem ser mantidas,
 pois representam variações naturais presentes na amostra.
 
-Caso ocorram alterações relevantes, recomenda-se investigar individualmente essas observações,
-verificando possíveis erros de coleta ou características específicas dos estabelecimentos.
-
 ## Interpretações do modelo selecionado
 
-O modelo final explica uma proporção estatisticamente significante e relevante da variância de
-`Vendas` ($R^2$ ajustado $=$ `{python} float(round(modelo_final.rsquared_adj, 3))`).
+O modelo final apresentou desempenho satisfatório na explicação da variabilidade da variável resposta
+**Vendas**, obtendo um coeficiente de determinação ajustado de 
+$R^2_{ajustado}=0,874$. Esse resultado indica que aproximadamente **87,4% da variação observada nas vendas**
+é explicada conjuntamente pelas variáveis incluídas no modelo, evidenciando uma boa capacidade explicativa.
+
+Por outro lado, as variáveis **Preço** e **Idade** apresentaram efeitos negativos. O aumento de uma unidade
+no preço do produto está associado a uma redução média de aproximadamente **0,095 unidades nas vendas**
+($\beta=-0,0953$), comportamento consistente com a relação esperada entre preço e demanda. Já a variável
+**Idade** apresentou coeficiente negativo de aproximadamente **-0,046** ($\beta=-0,0461$), indicando que
+lojas com maior idade tendem a apresentar uma pequena redução no volume esperado de vendas, mantendo as
+demais características constantes.
+
+A variável categórica **LocPrateleira** também apresentou influência significativa sobre as vendas. Os
+coeficientes representam diferenças em relação à categoria de referência utilizada pelo modelo. Comparadas à
+categoria de referência, lojas classificadas como **Médio** apresentam redução média de aproximadamente
+**2,88 unidades de venda** ($\beta=-2,8837$), enquanto lojas classificadas como **Ruim** apresentam redução
+de aproximadamente **4,84 unidades** ($\beta=-4,8357$). Esses resultados indicam que melhores posições de
+exposição dos produtos estão associadas a maiores vendas.
+
+De maneira geral, o modelo final mantém as variáveis com maior contribuição estatística e apresenta uma
+relação adequada entre capacidade explicativa e complexidade. A redução em relação ao modelo completo não
+comprometeu significativamente o ajuste, resultando em um modelo mais simples e interpretável.
+
+## 3.8.1 Coeficientes padronizados
+
+Os coeficientes padronizados foram calculados para permitir a comparação da importância relativa das
+variáveis quantitativas, uma vez que todas foram transformadas para a mesma escala de desvio-padrão.
+
+Os resultados obtidos foram:
+
+- **Preço**: $\beta=-0,729$
+- **PreçoConcorrente**: $\beta=0,454$
+- **Publicidade**: $\beta=0,344$
+- **Idade**: $\beta=-0,254$
+- **Renda**: $\beta=0,142$
+
+Observa-se que a variável com maior influência relativa sobre as vendas foi **Preço**, apresentando o maior
+coeficiente padronizado em valor absoluto. O sinal negativo indica que, entre as variáveis quantitativas
+analisadas, aumentos no preço possuem o maior impacto negativo relativo sobre as vendas.
+
+Em seguida, destacam-se **PreçoConcorrente** e **Publicidade**, que apresentam associações positivas e
+importantes com a variável resposta. A publicidade possui contribuição relativa superior à renda e à idade,
+indicando que investimentos nessa área possuem maior associação com o desempenho das vendas.
+
+Portanto, considerando apenas as variáveis quantitativas, o modelo sugere que o preço praticado pela loja,
+os preços dos concorrentes e os investimentos em publicidade são os principais fatores associados à variação
+das vendas.
 
 Mantendo as demais variáveis constantes, um aumento de uma unidade em `PreçoConcorrente`,
 `Renda`, `Publicidade`, `Preço` e `Idade` altera, respectivamente, o valor esperado das vendas em:
@@ -1082,30 +1163,28 @@ média da população e qualidade da localização na prateleira.
 
 pred = modelo_final.get_prediction(dadosTeste).summary_frame(alpha=0.05)
 
-tabela(pd.DataFrame({
-    "Cenário": ["Loja 1", "Loja 2"],
-    "Estimativa de vendas": pred["mean"].round(2),
-    "Limite inferior": pred["mean_ci_lower"].round(2),
-    "Limite superior": pred["mean_ci_upper"].round(2),
-}))
+vendas_reais = dadosTeste["Vendas"].values
+vendas_estimadas = pred["mean"].values
+
+erro = abs(vendas_reais - vendas_estimadas)
+erro_medio = erro.mean()
+
+resultado = pd.DataFrame({
+    "Cenário": [f"Loja {i+1}" for i in range(len(pred))],
+    "Vendas observadas": vendas_reais.round(2),
+    "Estimativa de vendas": vendas_estimadas.round(2),
+    "Erro absoluto": erro.round(2),
+    "Limite inferior": pred["mean_ci_lower"].round(2).values,
+    "Limite superior": pred["mean_ci_upper"].round(2).values,
+})
+
+tabela(resultado)
+```
+```{python}
+print(f"Erro médio absoluto: {erro_medio:.2f}")
 ```
 
 O intervalo de confiança está relacionado ao valor médio esperado para as vendas. Com base nas variáveis escolhidas para fazer parte do modelo, que são as mais influentes na variável de interesse (vendas). Assim, com 95% de confiança, a média das vendas para o conjunto de teste se encontra no intervalo predito.
-
-
-##Intervalo de predição para uma nova observação
-
-```{python}
-#| label: tbl-ip
-#| tbl-cap: "Intervalos de predição de 95% para uma nova observação de vendas."
-
-tabela(pd.DataFrame({
-    "Cenário": ["Loja 1", "Loja 2"],
-    "Estimativa de vendas": pred["mean"].round(2),
-    "Limite inferior": pred["obs_ci_lower"].round(2),
-    "Limite superior": pred["obs_ci_upper"].round(2),
-}))
-```
 
 O intervalo de predição representa a faixa esperada para uma única observação com as características
 informadas. Esse intervalo é naturalmente mais amplo que o intervalo de confiança para a média,
