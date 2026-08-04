@@ -445,15 +445,23 @@ tabela(comparacao)
 ```
 
 A Tabela -@tbl-selecao apresenta a comparação entre o **modelo completo** e o **modelo reduzido** utilizando o coeficiente de determinação ajustado 
-(**$R^2$ ajustado**) e os critérios de informação **Akaike (AIC)** e **Bayesiano (BIC)**. Enquanto o **$R^2$ ajustado** mede a proporção da variabilidade 
-da variável resposta explicada pelo modelo, o **AIC** é um critério de seleção que busca equilibrar **qualidade de ajuste** e **complexidade**, 
-penalizando modelos com maior número de parâmetros. Assim, entre modelos ajustados aos mesmos dados, **o modelo com menor valor de AIC é considerado o 
-mais adequado**, pois tende a apresentar melhor capacidade de generalização sem incorporar variáveis desnecessárias.
+(**$R^2$ ajustado**) e os critérios de informação **Akaike (AIC)** e **Bayesiano (BIC)**. O ajuste dos modelos foi realizado utilizando **80% das 
+observações disponíveis na base de dados**, destinadas à etapa de treinamento e estimação dos parâmetros. Os **20% restantes** foram reservados para 
+a etapa posterior de predição, permitindo avaliar a capacidade de generalização do modelo em dados não utilizados durante o ajuste.
 
-Conforme observado na Tabela -@tbl-selecao, ambos os modelos apresentam praticamente o mesmo poder explicativo (**$R^2$ ajustado = 0,87**). Entretanto, 
-o **modelo reduzido** apresentou **AIC = 1158,47**, inferior ao do **modelo completo** (**AIC = 1161,97**), indicando que a remoção das variáveis 
-**População**, **Educação**, **Urbano** e **EUA** produziu um modelo mais parcimonioso sem perda relevante de qualidade de ajuste. O **BIC** também 
-favorece o modelo reduzido (**1190,40** contra **1209,87**), reforçando essa conclusão.
+Enquanto o **$R^2$ ajustado** mede a proporção da variabilidade da variável resposta explicada pelo modelo, o **AIC** é um critério de seleção que busca 
+equilibrar **qualidade de ajuste** e **complexidade**, penalizando modelos com maior número de parâmetros. Dessa forma, entre modelos ajustados aos 
+mesmos dados, **valores menores de AIC indicam modelos preferíveis**, pois representam um melhor compromisso entre capacidade explicativa e 
+simplicidade estrutural, reduzindo o risco de inclusão de variáveis pouco informativas.
+
+Conforme observado na Tabela -@tbl-selecao, ambos os modelos apresentam praticamente o mesmo poder explicativo (**$R^2$ ajustado $\approx 0,87$**). 
+Entretanto, o **modelo reduzido** apresentou **AIC = 1158,47**, inferior ao obtido pelo **modelo completo** (**AIC = 1161,97**), indicando que a 
+remoção das variáveis **População**, **Educação**, **Urbano** e **EUA** resultou em um modelo mais parcimonioso, sem perda significativa de 
+capacidade explicativa.
+
+O mesmo comportamento é observado pelo critério **BIC**, que também favorece o modelo reduzido (**1190,40**) em comparação ao modelo completo 
+(**1209,87**). Esse resultado reforça a escolha do modelo reduzido como modelo final, uma vez que ele apresenta desempenho estatístico equivalente, 
+menor complexidade e maior potencial de generalização para as observações reservadas na etapa de predição.
 
 ```{python}
 #| label: tbl-anova-modelos
@@ -783,7 +791,7 @@ O gráfico de **escala-localização** @fig-diagnostico não apresentou tendênc
 
 A avaliação da normalidade dos resíduos, realizada por meio do envelope normal, mostrou que a maior parte das observações permanece dentro da região esperada. Embora alguns pontos apresentem pequenos desvios nas extremidades, o comportamento geral dos resíduos fornece suporte à suposição de normalidade dos erros.
 
-## 3.6.1 Identificação de pontos atípicos, de alavanca e influentes
+### Identificação de pontos atípicos, de alavanca e influentes
 
 A identificação de observações potencialmente problemáticas foi realizada utilizando três medidas complementares: **resíduos studentizados**, **alavancagem** e **distância de Cook**. Os resíduos studentizados permitem identificar observações com valores discrepantes em relação ao comportamento esperado pelo modelo, sendo consideradas potencialmente atípicas aquelas com valor absoluto superior a 2. A medida de alavancagem avalia o quanto uma observação possui valores extremos nas variáveis explicativas, enquanto a distância de Cook mensura o impacto global de cada observação sobre as estimativas dos coeficientes.
 
@@ -908,66 +916,82 @@ tabela(
 )
 ```
 
-A análise do impacto das observações influentes foi realizada comparando as estimativas dos
-coeficientes do modelo final com aquelas obtidas após a remoção das observações indicadas pela
-distância de Cook.
+A Tabela -@tbl-refinado apresenta a comparação entre os coeficientes estimados no **modelo final** e no
+**modelo refinado**, obtido após a remoção das observações identificadas como influentes pela distância de
+Cook. Essa análise tem como objetivo verificar a sensibilidade das estimativas à presença dessas observações.
 
-Caso as diferenças entre os coeficientes sejam pequenas, conclui-se que as observações detectadas
-não possuem influência excessiva sobre o ajuste do modelo. Dessa forma, elas podem ser mantidas,
-pois representam variações naturais presentes na amostra.
+Observa-se que as alterações nos coeficientes foram, em geral, de pequena magnitude. As maiores variações
+percentuais ocorreram para as variáveis **Publicidade** (**6,08%**) e **Idade** (**5,64%**), enquanto os
+demais coeficientes apresentaram diferenças inferiores a aproximadamente **4%**. Além disso, os sinais dos
+coeficientes permaneceram inalterados, preservando a interpretação dos efeitos de todas as variáveis
+explicativas.
+
+Esses resultados indicam que, embora algumas observações tenham sido identificadas como potencialmente
+influentes, sua remoção não altera de forma substancial as estimativas do modelo nem as conclusões da análise.
+Assim, as observações influentes foram mantidas no conjunto de dados, por apresentarem comportamento
+compatível com a variabilidade natural da amostra e não evidenciarem erros de registro ou medição.
 
 ## Interpretações do modelo selecionado
 
-O modelo final apresentou desempenho satisfatório na explicação da variabilidade da variável resposta
-**Vendas**, obtendo um coeficiente de determinação ajustado de 
-$R^2_{ajustado}=0,874$. Esse resultado indica que aproximadamente **87,4% da variação observada nas vendas**
-é explicada conjuntamente pelas variáveis incluídas no modelo, evidenciando uma boa capacidade explicativa.
+O modelo final apresentou desempenho satisfatório na explicação da variável resposta **Vendas**, com 
+coeficiente de determinação ajustado de **$R^2_{ajustado}=0,874$**, indicando que aproximadamente **87,4% da 
+variabilidade observada nas vendas** é explicada pelas variáveis incluídas no modelo.
 
-Por outro lado, as variáveis **Preço** e **Idade** apresentaram efeitos negativos. O aumento de uma unidade
-no preço do produto está associado a uma redução média de aproximadamente **0,095 unidades nas vendas**
-($\beta=-0,0953$), comportamento consistente com a relação esperada entre preço e demanda. Já a variável
-**Idade** apresentou coeficiente negativo de aproximadamente **-0,046** ($\beta=-0,0461$), indicando que
-lojas com maior idade tendem a apresentar uma pequena redução no volume esperado de vendas, mantendo as
-demais características constantes.
+A interpretação dos coeficientes foi realizada mantendo as demais variáveis constantes. Para as variáveis 
+quantitativas, um aumento de uma unidade em **PreçoConcorrente** está associado a um aumento médio de 
+aproximadamente **0,093 unidades de venda** ($\beta=0,0926$). A variável **Renda** apresentou efeito positivo, 
+com aumento esperado de aproximadamente **0,016 unidades de venda** para cada unidade adicional 
+($\beta=0,0158$). 
 
-A variável categórica **LocPrateleira** também apresentou influência significativa sobre as vendas. Os
-coeficientes representam diferenças em relação à categoria de referência utilizada pelo modelo. Comparadas à
-categoria de referência, lojas classificadas como **Médio** apresentam redução média de aproximadamente
-**2,88 unidades de venda** ($\beta=-2,8837$), enquanto lojas classificadas como **Ruim** apresentam redução
-de aproximadamente **4,84 unidades** ($\beta=-4,8357$). Esses resultados indicam que melhores posições de
-exposição dos produtos estão associadas a maiores vendas.
+A variável **Publicidade** apresentou coeficiente positivo de **0,116** ($\beta=0,1159$), indicando que maiores 
+investimentos em publicidade estão associados a maiores volumes de vendas, mantendo as demais características 
+constantes.
 
-De maneira geral, o modelo final mantém as variáveis com maior contribuição estatística e apresenta uma
-relação adequada entre capacidade explicativa e complexidade. A redução em relação ao modelo completo não
-comprometeu significativamente o ajuste, resultando em um modelo mais simples e interpretável.
+Em contrapartida, as variáveis **Preço** e **Idade** apresentaram efeitos negativos. O aumento de uma unidade 
+no preço do produto está associado a uma redução média de aproximadamente **0,095 unidades de venda** 
+($\beta=-0,0953$). De forma semelhante, a variável **Idade** apresentou redução esperada de aproximadamente 
+**0,046 unidades de venda** para cada unidade adicional ($\beta=-0,0461$).
+
+A variável categórica **LocPrateleira** também apresentou efeito significativo sobre as vendas. Seus coeficientes 
+representam diferenças em relação à categoria de referência adotada pelo modelo. As categorias **Médio** e 
+**Ruim** apresentaram reduções médias de aproximadamente **2,88** e **4,84 unidades de venda**, respectivamente, 
+quando comparadas à categoria de referência. Esse resultado evidencia a importância da posição do produto na 
+prateleira para o desempenho comercial.
+
+De forma geral, o modelo final mantém as variáveis mais relevantes para explicar a variação das vendas, 
+apresentando uma relação adequada entre capacidade explicativa, simplicidade e interpretabilidade.
+
 
 ## 3.8.1 Coeficientes padronizados
 
-Os coeficientes padronizados foram calculados para permitir a comparação da importância relativa das
-variáveis quantitativas, uma vez que todas foram transformadas para a mesma escala de desvio-padrão.
+Os coeficientes padronizados foram calculados com o objetivo de comparar a contribuição relativa das variáveis 
+quantitativas do modelo, uma vez que todas foram transformadas para a mesma escala de desvio-padrão. Dessa 
+forma, o módulo dos coeficientes permite avaliar quais variáveis apresentam maior associação relativa com a 
+variável resposta.
 
-Os resultados obtidos foram:
+Os coeficientes padronizados obtidos foram:
 
-- **Preço**: $\beta=-0,729$
-- **PreçoConcorrente**: $\beta=0,454$
-- **Publicidade**: $\beta=0,344$
-- **Idade**: $\beta=-0,254$
-- **Renda**: $\beta=0,142$
+| Variável | Coeficiente padronizado |
+|---|---:|
+| Preço | -0,729 |
+| PreçoConcorrente | 0,454 |
+| Publicidade | 0,344 |
+| Idade | -0,254 |
+| Renda | 0,142 |
 
-Observa-se que a variável com maior influência relativa sobre as vendas foi **Preço**, apresentando o maior
-coeficiente padronizado em valor absoluto. O sinal negativo indica que, entre as variáveis quantitativas
-analisadas, aumentos no preço possuem o maior impacto negativo relativo sobre as vendas.
+Observa-se que a variável **Preço** apresentou a maior associação relativa com as vendas, considerando o maior 
+valor absoluto do coeficiente padronizado ($|\beta|=0,729$). O sinal negativo indica que, entre as variáveis 
+quantitativas analisadas, aumentos no preço possuem a maior relação negativa relativa com o volume de vendas.
 
-Em seguida, destacam-se **PreçoConcorrente** e **Publicidade**, que apresentam associações positivas e
-importantes com a variável resposta. A publicidade possui contribuição relativa superior à renda e à idade,
-indicando que investimentos nessa área possuem maior associação com o desempenho das vendas.
+Em seguida, destacam-se as variáveis **PreçoConcorrente** ($\beta=0,454$) e **Publicidade** 
+($\beta=0,344$), que apresentam associações positivas relevantes com a variável resposta. Esse resultado sugere 
+que fatores relacionados ao ambiente competitivo e aos investimentos em divulgação possuem papel importante na 
+explicação da variação das vendas. As variáveis **Idade** e **Renda** apresentaram menor contribuição relativa 
+quando comparadas às demais variáveis quantitativas.
 
-Portanto, considerando apenas as variáveis quantitativas, o modelo sugere que o preço praticado pela loja,
-os preços dos concorrentes e os investimentos em publicidade são os principais fatores associados à variação
-das vendas.
-
-Mantendo as demais variáveis constantes, um aumento de uma unidade em `PreçoConcorrente`,
-`Renda`, `Publicidade`, `Preço` e `Idade` altera, respectivamente, o valor esperado das vendas em:
+Considerando agora os coeficientes originais do modelo final, a interpretação é realizada mantendo todas as 
+demais variáveis constantes. Um aumento de uma unidade em `PreçoConcorrente`, `Renda`, `Publicidade`, `Preço` e 
+`Idade` altera, respectivamente, o valor esperado das vendas em:
 
 `{python} float(round(modelo_final.params["PreçoConcorrente"], 3))`,
 `{python} float(round(modelo_final.params["Renda"], 3))`,
@@ -975,15 +999,16 @@ Mantendo as demais variáveis constantes, um aumento de uma unidade em `PreçoCo
 `{python} float(round(modelo_final.params["Preço"], 3))`
 e
 `{python} float(round(modelo_final.params["Idade"], 3))`
+
 unidades de venda.
 
-Além disso, considerando a variável categórica `LocPrateleira`, os coeficientes representam a
-diferença esperada nas vendas em relação à categoria de referência utilizada pelo modelo.
+Além disso, considerando a variável categórica `LocPrateleira`, os coeficientes representam a diferença esperada 
+nas vendas em relação à categoria de referência utilizada pelo modelo. Dessa forma, os níveis da variável 
+categórica indicam o impacto da posição do produto na prateleira sobre o volume esperado de vendas.
 
-Os sinais dos coeficientes indicam a direção dos efeitos estimados e devem ser interpretados em
-conjunto com seus respectivos níveis de significância. O modelo final apresenta uma relação mais
-parcimoniosa entre capacidade explicativa e complexidade, mantendo as variáveis mais relevantes
-para explicar a variação das vendas.
+Os sinais dos coeficientes indicam a direção dos efeitos estimados e devem ser analisados conjuntamente com seus 
+respectivos níveis de significância estatística. O modelo final apresenta uma relação adequada entre capacidade 
+explicativa e complexidade, mantendo as variáveis mais relevantes para explicar a variação das vendas.
 
 ### Coeficientes padronizados
 
@@ -1009,18 +1034,39 @@ modelo_beta = smf.ols(
 modelo_beta.params.round(3)
 ```
 
-Os coeficientes padronizados permitem comparar a importância relativa das variáveis explicativas,
-pois todas estão representadas na mesma escala de desvio padrão.
+Os coeficientes padronizados permitem comparar a contribuição relativa das variáveis explicativas,
+pois todas foram transformadas para a mesma escala de desvio padrão. Dessa forma, o módulo dos
+coeficientes indica quais variáveis apresentam maior associação relativa com a variável resposta,
+independentemente das unidades originais de medida.
 
-O maior coeficiente em valor absoluto indica a variável com maior contribuição relativa para a
-explicação das vendas. Dessa forma, variáveis com coeficientes padronizados mais elevados possuem
-maior associação com a variável resposta quando comparadas às demais preditoras quantitativas.
+Os resultados mostram que a variável **Preço** apresentou o maior coeficiente padronizado em valor
+absoluto ($\beta=-0,729$), indicando a maior contribuição relativa entre as variáveis quantitativas
+avaliadas. O sinal negativo indica uma associação inversa, sugerindo que aumentos no preço estão
+relacionados a reduções nas vendas.
+
+Em seguida, destacam-se **PreçoConcorrente** ($\beta=0,454$) e **Publicidade** ($\beta=0,344$),
+que apresentam associações positivas relevantes com a variável resposta. Esses resultados indicam
+que variações nessas variáveis possuem maior relação relativa com o comportamento das vendas quando
+comparadas às demais variáveis quantitativas.
+
+As variáveis **Idade** ($\beta=-0,254$) e **Renda** ($\beta=0,142$) apresentaram menores
+coeficientes padronizados, indicando menor contribuição relativa para explicar a variabilidade das
+vendas.
+
+Assim, considerando exclusivamente as variáveis quantitativas do modelo, **Preço**, **PreçoConcorrente**
+e **Publicidade** são os principais fatores associados à variação das vendas, de acordo com a magnitude
+dos coeficientes padronizados.
 
 ## Regressão com variável categórica (qualidade da prateleira como explicativa)
 
-Além das variáveis quantitativas, o modelo final inclui a variável categórica `LocPrateleira`.
-O `patsy` (utilizado internamente pelo `statsmodels`) realiza automaticamente a codificação por
-variáveis dummy, utilizando uma categoria como referência:
+Além das variáveis quantitativas, o modelo final inclui a variável categórica `LocPrateleira`, que
+representa a qualidade da localização dos produtos na prateleira. O objetivo dessa análise é verificar
+se a posição de exposição dos produtos apresenta associação adicional com as vendas após controlar
+pelos demais fatores incluídos no modelo.
+
+O `patsy`, utilizado internamente pelo `statsmodels`, realiza automaticamente a transformação de
+variáveis categóricas em variáveis dummy. Nesse processo, uma das categorias é definida como referência,
+e os coeficientes estimados representam diferenças em relação a essa categoria base.
 
 ```{python}
 #| echo: true
@@ -1142,18 +1188,48 @@ tabela(pd.DataFrame({
     ],
 }))
 ```
+A @tbl-geral apresenta a comparação entre os modelos considerados durante o processo de
+seleção, utilizando o número de observações, o coeficiente de determinação ajustado ($R^2$ ajustado)
+e o critério de informação de Akaike (AIC). O $R^2$ ajustado permite avaliar a proporção da
+variabilidade das vendas explicada pelo modelo, considerando uma penalização pelo número de
+variáveis incluídas. Já o AIC é uma métrica de seleção que busca equilibrar qualidade de ajuste e
+complexidade do modelo, penalizando a inclusão de parâmetros que não proporcionam ganho
+significativo de informação. Dessa forma, entre modelos ajustados ao mesmo conjunto de dados,
+valores menores de AIC indicam modelos preferíveis, pois apresentam melhor equilíbrio entre ajuste
+e parcimônia.
 
-O modelo final foi escolhido considerando o equilíbrio entre capacidade explicativa, simplicidade e
-interpretação dos coeficientes. Embora modelos mais complexos possam apresentar maior ajuste, a
-redução do número de variáveis contribui para um modelo mais parcimonioso, mantendo desempenho
-estatístico adequado.
+Conforme observado na Tabela -@tbl-geral, o modelo completo apresentou o maior número
+de variáveis explicativas, alcançando $R^2$ ajustado de aproximadamente 0,88 e AIC de 895,68. O
+modelo reduzido manteve capacidade explicativa semelhante, com $R^2$ ajustado de 0,87, porém
+apresentou menor AIC (892,41), indicando que a remoção de variáveis com menor contribuição
+estatística resultou em um modelo mais eficiente.
+
+O modelo sem a variável `PreçoConcorrente` apresentou redução significativa no poder explicativo,
+com $R^2$ ajustado de 0,71, evidenciando que essa variável possui contribuição relevante para a
+explicação das vendas. Apesar da redução da complexidade, a perda de ajuste torna esse modelo menos
+adequado quando comparado às demais alternativas.
+
+Por fim, o modelo final selecionado apresentou desempenho equivalente ao modelo reduzido, mantendo
+$R^2$ ajustado de 0,87 e AIC de 892,41. Dessa forma, a escolha do modelo final foi baseada no
+equilíbrio entre capacidade explicativa, menor complexidade estrutural e facilidade de interpretação
+dos coeficientes. O modelo selecionado mantém as variáveis com maior contribuição para explicar a
+variação das vendas, evitando a inclusão de preditores que não agregam informação significativa ao
+ajuste.
 
 # Previsões
 
-Utilizando o modelo final selecionado (`modelo_final`), foram realizadas previsões para dois cenários
-hipotéticos de uma loja. Os cenários consideram diferentes valores para as variáveis explicativas
-presentes no modelo: preço do concorrente, renda, publicidade, preço praticado pela empresa, idade
-média da população e qualidade da localização na prateleira.
+Utilizando o modelo final selecionado (`modelo_final`), foram realizadas previsões sobre um conjunto
+de teste composto por **20% das observações da base de dados**, que não participaram da etapa de
+estimação dos coeficientes do modelo. A divisão dos dados foi realizada com o objetivo de avaliar a
+capacidade de generalização do modelo para novas observações, verificando se o desempenho obtido
+durante o ajuste se mantém em dados independentes.
+
+O modelo foi ajustado utilizando os **80% restantes das observações**, denominados conjunto de
+treinamento, sendo utilizadas as variáveis selecionadas durante o processo de modelagem:
+`PreçoConcorrente`, `Renda`, `Publicidade`, `Preço`, `Idade` e `LocPrateleira`. Posteriormente, as
+previsões foram comparadas com os valores reais de vendas observados no conjunto de teste, permitindo
+avaliar o erro de previsão do modelo.
+
 
 ## Intervalo de confiança para o valor médio esperado
 
@@ -1184,12 +1260,23 @@ tabela(resultado)
 print(f"Erro médio absoluto: {erro_medio:.2f}")
 ```
 
-O intervalo de confiança está relacionado ao valor médio esperado para as vendas. Com base nas variáveis escolhidas para fazer parte do modelo, que são as mais influentes na variável de interesse (vendas). Assim, com 95% de confiança, a média das vendas para o conjunto de teste se encontra no intervalo predito.
+A @tbl-ic apresenta os intervalos de confiança de 95% para o valor médio esperado das vendas nas
+observações pertencentes ao conjunto de teste. Esses intervalos representam a incerteza associada à
+estimativa da média das vendas para lojas com características semelhantes às observadas.
 
-O intervalo de predição representa a faixa esperada para uma única observação com as características
-informadas. Esse intervalo é naturalmente mais amplo que o intervalo de confiança para a média,
-pois incorpora tanto a incerteza na estimação dos coeficientes quanto a variabilidade natural das
-vendas entre diferentes circunstâncias.
+O erro médio absoluto obtido no conjunto de teste foi de **0,98 unidades de venda**, indicando que,
+em média, as previsões realizadas pelo modelo apresentaram pequena diferença em relação aos valores
+reais observados. Esse resultado sugere que o modelo mantém desempenho adequado quando aplicado a
+dados que não foram utilizados durante sua estimação.
+
+O intervalo de confiança está relacionado ao valor médio esperado das vendas para um conjunto de lojas
+com características semelhantes. Assim, com 95% de confiança, a média das vendas para as observações do
+conjunto de teste encontra-se dentro do intervalo calculado.
+
+Já o intervalo de predição representa a faixa esperada para uma única nova observação com determinadas
+características. Esse intervalo é naturalmente mais amplo que o intervalo de confiança para a média,
+pois incorpora tanto a incerteza associada à estimação dos coeficientes quanto a variabilidade natural
+das vendas entre diferentes lojas e condições de mercado.
 
 # Conclusão
 
